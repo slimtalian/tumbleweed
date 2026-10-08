@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Tumbleweed · Local knowledge workspace</title><link rel="icon" href="/favicon.svg"><link rel="stylesheet" href="/style.css"><link rel="stylesheet" href="/specimen.css"><script src="/graph.js" defer></script><script src="/catalog.js" defer></script><script src="/specimen.js" defer></script><script src="/app.js" defer></script></head>
+<body>
+<div class="shell">
+ <aside class="sidebar"><button id="menu-toggle" aria-label="Toggle navigation" aria-expanded="false">☰</button><a class="brand" href="#graph" aria-label="Tumbleweed — explore knowledge"><svg class="brand-wordmark" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 90" fill="none">
+  <title>Tumbleweed — an unraveling of stems</title>
+  <defs>
+    <!-- Each letter is drawn as a growing stem, rather than set in a font. -->
+    <path id="unraveled-lettering" d="
+      M80 29C91 27 109 29 123 24 M105 28C102 40 98 59 102 68C105 76 114 67 119 61
+      M124 44C122 52 119 67 127 70C137 75 149 51 151 43C149 53 145 67 153 70C157 72 161 66 165 61
+      M164 70C166 59 168 49 169 43M166 61C172 49 180 40 185 45C190 50 182 65 186 70M185 61C191 49 201 40 206 45C211 51 202 64 207 70C211 73 215 68 219 63
+      M218 67C217 52 224 31 231 22C237 14 238 23 232 32C224 45 215 58 219 66C226 81 247 64 246 54C245 44 229 46 221 59
+      M249 62C252 45 269 21 266 19C258 13 249 39 248 56C246 76 257 76 266 65
+      M271 59C284 60 298 47 289 45C276 42 264 62 274 70C283 78 295 69 301 62
+      M307 45C303 55 304 69 310 70C316 71 324 55 328 45C325 59 327 73 334 70C344 64 352 45 347 43C344 42 344 47 351 50
+      M355 59C369 60 381 47 373 45C360 42 347 62 357 70C366 77 378 69 384 62
+      M390 59C403 60 416 47 408 45C394 42 383 62 392 70C402 78 416 67 422 60
+      M448 49C435 39 421 53 424 66C427 78 443 67 448 54M448 56C450 41 460 22 462 18C456 13 446 42 446 60C446 76 458 74 466 64"/>
+  </defs>
+  <!-- The original seed head opens on the right into the first letter. -->
+  <g stroke="#bdab83" stroke-linecap="round" stroke-linejoin="round" transform="translate(1 5)">
+    <path stroke-width="1.65" d="M13 49C8 37 16 20 28 15C40 8 58 15 65 27C75 39 70 55 58 62C45 73 24 65 18 55C11 43 15 29 28 21C41 15 59 20 63 34C69 50 53 65 38 60"/>
+    <path stroke-width="1.3" d="M24 61C17 49 21 26 36 18C46 13 54 20 54 29C55 42 38 59 27 58C18 58 19 44 29 36C41 25 62 27 66 40C70 53 54 58 40 53C25 47 17 32 26 22"/>
+    <path stroke-width="1.25" d="M14 39C23 23 47 18 57 28C67 37 54 54 43 58C28 63 27 52 32 39C36 27 50 15 56 24C63 34 54 53 39 62M20 24C30 23 40 32 42 43C46 56 52 63 62 56"/>
+    <path stroke-width="1.05" opacity=".72" d="M14 47C26 35 48 32 63 42M22 18C23 33 34 51 58 57M31 16C33 28 58 33 62 47M18 54C34 49 38 32 34 23M28 62C45 63 67 41 60 29M17 32C28 31 50 45 51 61"/>
+    <path stroke-width="1.2" d="M28 15L26 8M27 12L21 10M49 15L53 8M52 10L58 11M64 26L70 22M67 24L68 17M69 45L76 48M54 64L56 70M34 66L31 73M33 68L25 70M15 48L8 52M11 50L7 44M14 30L8 27M21 24L18 19M35 37L31 29M37 45L46 40M53 36L58 32M27 52L24 45"/>
+  </g>
+  <g stroke="#bdab83" stroke-linecap="round" stroke-linejoin="round">
+    <!-- Unwinding fibers lead into the crossbar and the lower writing strand. -->
+    <path stroke-width="1.35" d="M47 64C78 70 68 35 89 28C99 24 113 30 124 23M39 57C64 69 75 68 92 67C108 66 112 77 129 76"/>
+    <path stroke-width=".8" opacity=".7" d="M55 35C74 45 70 57 92 61M68 43C81 39 80 28 96 26M64 72C80 76 87 75 98 72"/>
+    <use href="#unraveled-lettering" stroke-width=".85" opacity=".47" transform="translate(-1.3 1.7)"/>
+    <use href="#unraveled-lettering" stroke-width="2.2" stroke="#caba94"/>
+    <!-- Sparse forks and loose fibers keep the letter silhouettes readable. -->
+    <path stroke-width=".9" opacity=".8" d="M90 28L86 22M98 51L93 48M108 28L112 18M111 22L118 22M127 66L122 75M148 48L155 39M169 45L166 38M182 48L190 39M206 55L213 52M217 67L211 74M231 24L230 15M241 54L250 50M252 38L247 33M262 24L269 14M275 69L271 77M287 46L293 39M304 53L298 50M326 52L333 40M341 62L350 66M357 69L355 77M370 47L377 41M391 62L385 59M402 47L407 38M425 65L420 72M450 42L456 36M459 24L466 22M459 72L468 77"/>
+    <path stroke-width=".75" opacity=".58" d="M151 74C163 69 173 72 183 76M211 78C227 81 241 70 251 72M291 73C303 79 314 76 324 73M373 74C387 81 407 72 421 75M449 73C461 81 474 77 476 69"/>
+  </g>
+</svg>
+</a>
+ <button class="primary capture" id="capture">+ Capture</button>
+ <nav class="workspace-dock" aria-label="Workspace"><button data-view="graph"><span aria-hidden="true"><img class="dock-mark" src="/favicon.svg" alt="" width="22" height="22"></span> Explore</button><button data-view="knowledge"><span>▤</span> Read <b id="record-count">0</b></button><button data-view="projects"><span>◈</span> Make <b id="project-count">0</b></button><button data-view="discover"><span>⌁</span> Connect</button></nav>
+ <div class="sidebar-bottom"><details class="workspace-tools"><summary>Workspace</summary><nav aria-label="Tools"><button data-view="decisions">Decisions</button><button data-view="imports">Import Markdown & backups</button><button data-view="review">Collection review</button><button data-view="guide">Field guide</button></nav><div class="local-badge"><i></i><div>Only on this computer<small id="save-label">Connecting…</small></div></div></details></div>
+ </aside>
+ <main><header><div class="breadcrumb">WORKSPACE <span>/</span> <b id="view-label">Tumbleweed</b></div><button class="subtle" id="reload">Reload</button><button class="subtle" id="backup">Export backup</button></header>
+ <div class="page-heading"><div><div class="eyebrow" id="eyebrow">CONNECTIONS THAT COMPOUND</div><h1 id="title">Your knowledge, connected.</h1><p id="subtitle">Follow the evidence. Find what your next project can use.</p></div><div class="heading-stat"><strong id="count">0</strong><span>pieces of knowledge</span></div></div>
+ <section class="toolbar" aria-label="Knowledge filters"><label class="search"><span>⌕</span><input id="search" type="search" placeholder="Find a thought…" aria-label="Search knowledge"></label><button id="filter-toggle" type="button" aria-expanded="false">Filters</button><select id="collection" aria-label="Collection"><option value="">All collections</option></select><select id="sort" aria-label="Sort records"><option value="title">Title A–Z</option><option value="recent">Newest dated first</option></select><select id="topic" aria-label="Topic"><option value="">All topics</option></select><select id="coverage" aria-label="Evidence coverage"><option value="">All evidence</option></select><details class="filters"><summary>More filters</summary><div><label>From date <input id="from-date" type="date"></label><label>To date <input id="to-date" type="date"></label><label><input id="archived" type="checkbox"> Include archived</label><button id="clear-filters">Clear filters</button></div></details></section>
+ <div id="content" aria-live="polite"></div>
+ </main>
+</div>
+<dialog id="detail" class="detail-dialog"><div id="detail-content"></div></dialog>
+<dialog id="editor"><form id="edit-form"><div class="dialog-head"><h2 id="editor-title">Capture something</h2><button type="button" data-close="editor" aria-label="Close editor">×</button></div><input type="hidden" name="id"><div class="form-grid"><label>Kind<select name="kind"><option value="note">Note</option><option value="project">Project</option><option value="experience">Experience</option><option value="resource">Resource</option><option value="decision">Decision</option></select></label><label>Status<select name="status"><option value="reference">Reference</option><option value="planned">Planned</option><option value="active">Active</option><option value="paused">Paused</option><option value="completed">Completed</option></select></label></div><label>Title<input name="title" required maxlength="500"></label><label>Notes / context<textarea name="summary" rows="8"></textarea></label><label>Collection <small>Optional personal grouping</small><input name="collection" maxlength="120"></label><label>Topics <small>Comma separated</small><input name="topics"></label><label>Resource link <small>Optional</small><input name="url" type="url" placeholder="https://"></label><div class="project-fields"><h3>Continue with a clear next step</h3><label>I stopped at<input name="stopped_at"></label><label>Next time, start with<input name="next_action"></label><label>Before leaving, put away<input name="put_away"></label><label>Tasks <small>One per line; start completed tasks with [x]</small><textarea name="tasks" rows="4"></textarea></label></div><p class="muted" id="edit-note"></p><div class="form-error" role="alert"></div><footer><button type="button" data-close="editor">Cancel</button><button class="primary" type="submit">Save on this computer</button></footer></form></dialog>
+<dialog id="link-dialog"><form id="link-form"><div class="dialog-head"><h2>Make a meaningful connection</h2><button type="button" data-close="link-dialog" aria-label="Close connection editor">×</button></div><label>From<select name="from" required></select></label><label>Relationship<select name="relation"><option value="supports">Supports</option><option value="informs">Informs</option><option value="depends_on">Depends on</option><option value="implements">Implements</option><option value="grew_from">Grew from</option><option value="revision_of">Revision of</option><option value="supersedes">Supersedes</option><option value="related_to">Related to</option><option value="links_to">Links to</option></select></label><label>To<select name="to" required></select></label><label>Basis<select name="basis"><option value="inferred">Inferred association</option><option value="explicit">Explicit relationship</option></select></label><label>Why does this connection matter?<textarea name="rationale" rows="4" required></textarea></label><p class="muted">Shared topics suggest relevance. They do not establish dependency or prove a claim.</p><div class="form-error" role="alert"></div><footer><button type="button" data-close="link-dialog">Cancel</button><button class="primary">Save relationship</button></footer></form></dialog>
+<dialog id="confirm-dialog"><div class="dialog-head"><h2 id="confirm-title"></h2></div><p id="confirm-text"></p><footer><button id="confirm-no">Cancel</button><button class="primary" id="confirm-yes">Continue</button></footer></dialog>
+<div id="toast" role="status" hidden></div>
+<noscript>This local application requires JavaScript. Your data remains in the data folder.</noscript>
+</body></html>
