@@ -10,6 +10,7 @@ from pathlib import Path
 import re
 import secrets
 import threading
+import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from datetime import datetime, timezone
 import zipfile
@@ -18,6 +19,8 @@ from urllib.parse import unquote
 
 ROOT = Path(__file__).resolve().parent
 MAX_BYTES = 24 * 1024 * 1024
+MAX_WORKSPACE_BYTES = 128 * 1024 * 1024
+MAX_RESTORE_BYTES = MAX_WORKSPACE_BYTES + 1024 * 1024
 
 def now():
     return datetime.now(timezone.utc).isoformat()
@@ -89,12 +92,19 @@ def graph_items(g, ns):
 
 def validate_state(s):
     require(isinstance(s, dict) and s.get('format') == 'tumbleweed-local-1', 'This is not a Tumbleweed Local backup.')
-    require(isinstance(s.get('revision'), int), 'Invalid revision.')
+    require(type(s.get('revision')) is int and s['revision'] >= 0, 'Invalid revision.')
     for group in ('records', 'sources', 'edges'):
         require(isinstance(s.get(group), dict) and len(s[group]) <= 30000, f'Invalid {group}.')
         for k, v in s[group].items():
             require(isinstance(v, dict) and v.get('id') == k, f'Invalid {group} identity.')
-    namespaces = {r.get('namespace') for r in s['records'].values() if r.get('imported')}
+    namespaces = set()
+    for group in ('records', 'sources', 'edges'):
+        for item in s[group].values():
+            if item.get('namespace') is not None or item.get('imported') or group == 'sources':
+                ns = item.get('namespace')
+                require(isinstance(ns, str) and re.fullmatch(r'[a-z0-9][a-z0-9_-]{0,63}', ns) and ns not in ('local', 'local-edge'), 'Invalid bundle namespace.')
+                require(isinstance(item.get('raw'), dict), 'Imported items must retain their original source data.')
+                namespaces.add(ns)
     for ns in namespaces:
         require(isinstance(ns, str), 'Missing bundle namespace.')
         graph = validate_graph({'schema_version': '1.0', **{group: [v['raw'] for v in s[group].values() if v.get('namespace') == ns] for group in ('records', 'sources', 'edges')}})
@@ -112,7 +122,8 @@ def validate_state(s):
             require(isinstance(r.get('title'), str) and r.get('kind') in ('project', 'note', 'experience', 'resource', 'decision'), 'Invalid local record.')
     for e in s['edges'].values():
         require(e.get('from') in s['records'] and e.get('to') in s['records'], 'Backup has broken relationships.')
-        require(isinstance(e.get('relation'), str), 'Invalid relationship.')
+        require(isinstance(e.get('relation'), str) and bool(e['relation'].strip()), 'Invalid relationship.')
+        require(e.get('basis') in ('explicit', 'inferred') and isinstance(e.get('rationale', ''), str), 'Invalid relationship evidence.')
     require(isinstance(s.get('batches'), list) and isinstance(s.get('bundles'), dict), 'Invalid import history.')
     for b in s['batches']:
         require(isinstance(b, dict) and all(isinstance(b.get(k), str) for k in ('id', 'date', 'namespace')) and isinstance(b.get('count'), int) and isinstance(b.get('changes'), list), 'Invalid import batch.')
@@ -135,20 +146,44 @@ class Store:
 
     def write(self):
         validate_state(self.state)
+        serialized = json.dumps(self.state, ensure_ascii=False, indent=2).encode('utf8')
+        require(len(serialized) <= MAX_WORKSPACE_BYTES, 'Workspace exceeds the 128 MB limit. This change was not saved. Keep this collection and start a separate workspace for more material.')
         if self.path.exists():
             backups = self.folder / 'backups'
             backups.mkdir(exist_ok=True)
             name = datetime.now().strftime('%Y%m%d-%H%M%S-%f') + '.json'
             (backups / name).write_bytes(self.path.read_bytes())
         temp = self.folder / 'workspace.pending'
-        with temp.open('w', encoding='utf8') as f:
-            json.dump(self.state, f, ensure_ascii=False, indent=2)
+        with temp.open('wb') as f:
+            f.write(serialized)
             f.flush()
             os.fsync(f.fileno())
-        os.replace(temp, self.path)
+        # File indexing or antivirus can briefly hold a Windows destination open.
+        # Retry the atomic replace; never fall back to truncating the saved file.
+        for attempt in range(5):
+            try:
+                os.replace(temp, self.path)
+                break
+            except PermissionError:
+                if attempt == 4:
+                    raise
+                time.sleep(.05 * (attempt + 1))
 
     def merge(self, g, ns, accepted, initial=False):
         incoming = graph_items(g, ns)
+        require(isinstance(accepted, list), 'Invalid conflict selections.')
+        approved = set()
+        for choice in accepted:
+            if isinstance(choice, dict):
+                group, key = choice.get('group'), choice.get('id')
+                require(isinstance(group, str) and group in incoming and isinstance(key, str) and key in incoming[group], 'Invalid conflict selection.')
+            else:
+                # Older clients used only an ID. Never let that approve two item types.
+                require(isinstance(choice, str), 'Invalid conflict selection.')
+                matches = [group for group in incoming if choice in incoming[group]]
+                require(len(matches) == 1, 'This conflict ID occurs in multiple item types. Reload and preview again.')
+                group, key = matches[0], choice
+            approved.add((group, key))
         bundle_before = copy.deepcopy(self.state['bundles'].get(ns))
         changes = []
         for group, rows in incoming.items():
@@ -156,7 +191,7 @@ class Store:
                 old = self.state[group].get(key)
                 if old and digest(old.get('raw')) == digest(value.get('raw')):
                     continue
-                if old and key not in accepted:
+                if old and (group, key) not in approved:
                     continue
                 if old and group == 'records':
                     value['annotations'] = copy.deepcopy(old.get('annotations', {}))
@@ -190,6 +225,7 @@ class Store:
 
     def mutate(self, req):
         with self.lock:
+            require(isinstance(req, dict), 'Expected a JSON object.')
             require(req.get('revision') == self.state['revision'], 'Workspace changed in another window. Reload before saving.')
             previous = copy.deepcopy(self.state)
             try:
@@ -206,6 +242,7 @@ class Store:
         action = req.get('action')
         if action == 'save-record':
             value = req.get('record', {})
+            require(isinstance(value, dict), 'Record must be an object.')
             key = value.get('id') or 'local::' + secrets.token_hex(12)
             old = self.state['records'].get(key)
             require(not value.get('id') or old is not None, 'This record no longer exists. Reload before editing.')
@@ -214,7 +251,7 @@ class Store:
             for field in ('title', 'summary', 'next_action', 'stopped_at', 'put_away', 'url', 'collection'):
                 require(isinstance(allowed.get(field, ''), str), f'{field} must be text.')
             require(bool(allowed.get('title', '').strip()), 'A title is required.')
-            require(allowed.get('kind') in ('project', 'note', 'experience', 'resource', 'decision'), 'Choose a valid kind.')
+            require((old and old.get('imported')) or allowed.get('kind') in ('project', 'note', 'experience', 'resource', 'decision'), 'Choose a valid kind.')
             require(isinstance(allowed.get('topics', []), list) and all(isinstance(t, str) for t in allowed.get('topics', [])), 'Invalid topics.')
             require(isinstance(allowed.get('tasks', []), list) and all(isinstance(t, dict) and isinstance(t.get('text'), str) and isinstance(t.get('done'), bool) for t in allowed.get('tasks', [])), 'Invalid tasks.')
             if old and old.get('imported'):
@@ -307,18 +344,45 @@ class Store:
         else:
             raise ValueError('Unknown operation.')
 
+def eligible_note_path(path):
+    require(isinstance(path, str), 'Note path must be text.')
+    path = path.replace('\\', '/')
+    parts = path.split('/')
+    require(not path.startswith('/') and '..' not in parts and ':' not in path and all(parts), 'Invalid note path.')
+    if any(p.startswith('.') or p.lower() in ('optional_sensitive', 'tools', 'raw_export', 'raw-exports', 'staging') for p in parts):
+        return None
+    require(path.lower().endswith('.md'), 'Only Markdown files are accepted.')
+    return path
+
+
+def markdown_prose(content):
+    """Ignore metadata and code when deriving titles, topics, and backlinks."""
+    content = re.sub(r'\A\ufeff?---[^\S\n]*\n.*?\n---[^\S\n]*(?:\n|$)', '', content, count=1, flags=re.S)
+    lines, fence = [], None
+    for line in content.splitlines():
+        match = re.match(r'^ {0,3}(`{3,}|~{3,})(.*)$', line)
+        if fence:
+            if match and match[1][0] == fence[0] and len(match[1]) >= len(fence) and not match[2].strip():
+                fence = None
+            lines.append('')
+        elif match:
+            fence = match[1]
+            lines.append('')
+        else:
+            lines.append(line)
+    return re.sub(r'(`+).*?\1', '', '\n'.join(lines))
+
+
 def markdown_graph(files):
     require(isinstance(files, list) and 0 < len(files) <= 2000, 'Choose 1–2,000 Markdown files.')
     records, sources, edges = [], [], []
     paths = {}
     unresolved = []
     for f in files:
-        path = f['path'].replace('\\', '/')
-        parts = path.split('/')
-        require(not path.startswith('/') and '..' not in parts and ':' not in path, 'Invalid note path.')
-        if any(p.startswith('.') or p.lower() in ('optional_sensitive', 'tools', 'raw_export', 'raw-exports', 'staging') for p in parts):
+        require(isinstance(f, dict), 'Invalid Markdown file.')
+        path = eligible_note_path(f.get('path'))
+        if path is None:
             continue
-        require(path.lower().endswith('.md'), 'Only Markdown files are accepted.')
         require(path not in paths, 'Duplicate note path.')
         content = f['text']
         require(isinstance(content, str) and len(content) <= 2_000_000, 'Note is too large.')
@@ -326,12 +390,13 @@ def markdown_graph(files):
         sid = 'source-' + rid
         paths[path] = rid
         title = Path(path).stem
-        heading = re.search(r'^#\s+(.+)$', content, re.M)
+        prose = markdown_prose(content)
+        heading = re.search(r'^#\s+(.+)$', prose, re.M)
         if heading:
             title = heading[1].strip()
-        tags = sorted(set(re.findall(r'(?<![\w#])#([\w/-]+)', content)))
+        tags = sorted(set(re.findall(r'(?<![\w/#])#([\w/-]+)', prose)))
         aliases = []
-        front = re.match(r'^---\s*\n(.*?)\n---', content, re.S)
+        front = re.match(r'^\ufeff?---\s*\n(.*?)\n---', content, re.S)
         if front:
             for field, target in [('tags', tags), ('aliases', aliases)]:
                 match = re.search(r'^' + field + r':\s*\[([^\n]*)\]', front[1], re.M)
@@ -340,17 +405,19 @@ def markdown_graph(files):
         records.append({'id': rid, 'kind': 'artifact', 'title': title, 'summary': content, 'topics': sorted(set(tags)), 'aliases': aliases, 'claims': [], 'source_ids': [sid], 'sensitivity': 'general', 'coverage': 'local_markdown', 'dates': [], 'path': path})
         sources.append({'id': sid, 'title': path, 'kind': 'local_markdown', 'locator': {'relative_path': path}, 'verified_url': None, 'coverage': 'full_local_text', 'sensitivity': 'general'})
     for r in records:
-        prose = re.sub(r'^\s*(`{3,}|~{3,})[^\n]*\n.*?^\s*\1\s*$', '', r['summary'], flags=re.M | re.S)
-        prose = re.sub(r'`[^`\n]*`', '', prose)
+        prose = markdown_prose(r['summary'])
         links = re.findall(r'(?<!!)\[\[([^\]]+)\]\]', prose)
-        links += re.findall(r'(?<!!)\[[^\]]*\]\(([^)]+\.md(?:#[^)]*)?)\)', prose)
+        links += re.findall(r'(?<!!)\[[^\]]*\]\(([^)]+\.md(?:#[^)]*)?)\)', prose, re.I)
         for link in links:
             target = unquote(link.split('|')[0].split('#')[0].strip())
-            target = target.removesuffix('.md')
+            if not target or re.match(r'^[a-z][a-z0-9+.-]*:', target, re.I):
+                continue
+            stem = lambda path: re.sub(r'\.md$', '', path, flags=re.I)
+            target = stem(target)
             relative = posixpath.normpath(posixpath.join(posixpath.dirname(r['path']), target))
-            candidates = [x for x in records if x['path'].removesuffix('.md') == relative]
+            candidates = [x for x in records if stem(x['path']) == relative]
             if not candidates:
-                candidates = [x for x in records if x['path'].removesuffix('.md') == target]
+                candidates = [x for x in records if stem(x['path']) == target]
             if not candidates:
                 candidates = [x for x in records if Path(x['path']).stem == target or target in x.get('aliases', [])]
             unique = {x['id']: x for x in candidates}
@@ -409,8 +476,10 @@ def make_handler(store):
                 return self.send({'error': 'Cross-origin requests are rejected.'}, 403)
             try:
                 size = int(self.headers.get('Content-Length', '0'))
-                require(0 < size <= MAX_BYTES, 'Request exceeds the 24 MB limit.')
+                limit = MAX_RESTORE_BYTES if self.path == '/api/restore' else MAX_BYTES
+                require(0 < size <= limit, 'Backup exceeds the restore limit.' if self.path == '/api/restore' else 'Request exceeds the 24 MB import/save limit.')
                 req = json.loads(self.rfile.read(size))
+                require(isinstance(req, dict), 'Expected a JSON object.')
                 if self.path == '/api/stop':
                     self.send({'stopping': True})
                     threading.Thread(target=self.server.shutdown, daemon=True).start()
@@ -422,7 +491,7 @@ def make_handler(store):
                         with zipfile.ZipFile(io.BytesIO(raw)) as z:
                             require(len(z.infolist()) <= 5000 and sum(i.file_size for i in z.infolist()) <= MAX_BYTES, 'ZIP is too large.')
                             for info in z.infolist():
-                                if info.filename.lower().endswith('.md'):
+                                if not info.is_dir() and info.filename.lower().endswith('.md') and eligible_note_path(info.filename):
                                     files.append({'path': info.filename, 'text': z.read(info).decode('utf-8-sig')})
                         g = markdown_graph(files)
                     elif 'files' in req:
@@ -431,8 +500,10 @@ def make_handler(store):
                         g = req['graph']
                     with store.lock:
                         return self.send(store.preview(g, req['namespace']))
-                if self.path == '/api/mutate':
-                    return self.send({'state': store.mutate(req)})
+                if self.path in ('/api/mutate', '/api/restore'):
+                    require(self.path != '/api/restore' or req.get('action') == 'restore', 'This endpoint accepts backups only.')
+                    with store.lock:
+                        return self.send({'state': store.mutate(req)})
                 self.send({'error': 'Not found.'}, 404)
             except (ValueError, KeyError, TypeError, UnicodeError, zipfile.BadZipFile) as e:
                 self.send({'error': str(e)}, 400)

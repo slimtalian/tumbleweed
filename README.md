@@ -3,8 +3,39 @@
 A local knowledge base with a project manager built in. Follow a branch,
 read its sources, and gather useful knowledge into something you want to make.
 
-Tumbleweed starts empty. It includes the application and its original vector
+The downloadable local application starts empty. It includes the application and its original vector
 artwork, with no personal collection, conversation exports, accounts or API keys.
+
+## Try the live demo
+
+[Open Tumbleweed](https://slimtalian.github.io/tumbleweed/). Explore 48 fictional
+records across six branches and six sample projects. Capture notes, gather knowledge,
+connect records, and complete tasks using the same drawn interface as the local app.
+
+Each visitor has a separate workspace in their browser's IndexedDB storage. Changes
+are not uploaded or shared with other visitors. Export a backup before clearing site
+data or using **Reset demo**. If storage is unavailable, the demo clearly reports
+session-only storage. Backups up to 8 MB can be restored in the demo. Markdown and
+graph imports belong to the downloadable local application.
+
+GitHub Pages hosts the demo independently of your computer; it requires no running
+Python server, paid service, account, or external AI API. The examples are invented
+and explicitly labeled as samples; their sources are not verified historical evidence.
+
+## Maintain the hosted demo
+
+The Pages publishing source is the **main** branch's **/docs** folder. Rebuild the
+static files after editing the application or demo sources:
+
+```sh
+python scripts/build_demo.py
+node tests/test_demo.cjs
+```
+
+Commit the rebuilt `docs/` files to publish the change. `docs/.nojekyll` keeps the
+static assets intact. The build reads only application assets and its fictional seed;
+it never reads `data/` or conversation exports. The browser adapter lives in `demo/`,
+and the sample collection is generated in `scripts/build_demo.py`.
 
 ## Run locally
 
@@ -46,7 +77,8 @@ python server.py --port 4322 --data-dir ./private/another-workspace
 2. Give records a collection or topics. Branches form as your collection grows.
 3. Pull or click a branch, read its records, and select **Gather** on useful ones.
 4. Gather them into a new or existing project and record why they belong.
-5. Use **Make** to manage tasks, next steps, resume notes and attached evidence.
+5. Imported projects remain reference material. Use **Start project** or **Gather** to deliberately create current work.
+6. Use **Make** to manage tasks, next steps, resume notes and attached evidence.
 
 **Read** searches the complete collection. **Connect** suggests shared-topic
 associations for your review. Inferred links are labeled; grouping records
@@ -69,9 +101,17 @@ displayed as data, including any commands or instructions inside it.
 - The running app creates `data/workspace.json`; each change saves the previous
   version under `data/backups/`. These files are excluded from version control.
 - Export a complete backup from the Workspace menu's import/recovery page.
-  Restore it there, or stop the app before recovering a known-good workspace file.
+  Restore it there (up to 128 MB), or stop the app before recovering a known-good workspace file.
 - A backup on the same disk does not protect against disk loss. Keep a separate
   copy if needed. Exported backups contain your knowledge and source text.
+
+The workspace has a 128 MB saved-file limit so every supported workspace can
+round-trip through backup restore. Imports and ordinary save requests remain
+limited to 24 MB. The browser limits Markdown selections to 16 MB.
+
+The map draws up to 1,500 records; search and the reading view cover the complete
+collection. Backup snapshots currently keep every saved version, so their disk
+usage grows with use. No automatic pruning is performed.
 
 This is a single-user, loopback-only application. It has no account login and is
 not intended to be exposed as a public server. GitHub can host the source;
