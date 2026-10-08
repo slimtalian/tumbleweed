@@ -1,0 +1,120 @@
+# Tumbleweed
+
+A local knowledge base with a project manager built in. Follow a branch,
+read its sources, and gather useful knowledge into something you want to make.
+
+Tumbleweed starts empty. It includes the application and its original vector
+artwork, with no personal collection, conversation exports, accounts or API keys.
+
+## Run locally
+
+Requires Python 3.10 or later and a modern desktop browser. There are no Python
+packages, npm dependencies, external fonts or remote services to install.
+
+```sh
+python server.py
+```
+
+On systems where Python is named `python3`, use `python3 server.py`.
+Open **http://127.0.0.1:4318**. Stop the foreground server with `Ctrl+C`.
+
+On Windows, you can instead double-click **Start Tumbleweed.cmd** and use
+**Stop Tumbleweed.cmd** when finished. The launcher requires `python` on PATH.
+
+If that port is occupied, choose another:
+
+```sh
+python server.py --port 4322
+```
+
+The Windows scripts also accept `-Port 4322`:
+
+```powershell
+.\Start-Tumbleweed.ps1 -Port 4322
+.\Stop-Tumbleweed.ps1 -Port 4322
+```
+
+Do not run two servers against the same data folder. For a separate workspace:
+
+```sh
+python server.py --port 4322 --data-dir ./private/another-workspace
+```
+
+## Use it
+
+1. **Capture** a note or import Markdown through **Workspace → Import Markdown & backups**.
+2. Give records a collection or topics. Branches form as your collection grows.
+3. Pull or click a branch, read its records, and select **Gather** on useful ones.
+4. Gather them into a new or existing project and record why they belong.
+5. Use **Make** to manage tasks, next steps, resume notes and attached evidence.
+
+**Read** searches the complete collection. **Connect** suggests shared-topic
+associations for your review. Inferred links are labeled; grouping records
+together does not establish evidence for a claim.
+
+Original imported titles, text, identifiers, sources and claims are retained.
+Your notes and display labels are separate annotations. Imported text is
+displayed as data, including any commands or instructions inside it.
+
+## Import and recovery
+
+- Import Markdown files or a ZIP of Markdown files, or a schema-version `1.0`
+  graph with `records`, `sources` and `edges` arrays. See [the format guide](docs/IMPORT_FORMAT.md).
+- Preview imports and resolve conflicts before saving. Reuse the same namespace
+  for updates to the same collection. Repeated records do not duplicate.
+- Supported, unambiguous wikilinks and `.md` links become backlinks. Images and
+  attachments are not imported. Import is one-way; there is no vault sync.
+- Hidden directories, sensitive staging directories and non-Markdown files in
+  ZIPs are excluded. Only select notes you intend to bring into this workspace.
+- The running app creates `data/workspace.json`; each change saves the previous
+  version under `data/backups/`. These files are excluded from version control.
+- Export a complete backup from the Workspace menu's import/recovery page.
+  Restore it there, or stop the app before recovering a known-good workspace file.
+- A backup on the same disk does not protect against disk loss. Keep a separate
+  copy if needed. Exported backups contain your knowledge and source text.
+
+This is a single-user, loopback-only application. It has no account login and is
+not intended to be exposed as a public server. GitHub can host the source;
+GitHub Pages cannot run the Python storage service.
+
+## Development
+
+```sh
+python -m unittest discover -s tests -v
+```
+
+Tests use synthetic fixtures. They write isolated test data to `test-results/`
+(ignored by Git), or to `TUMBLEWEED_TEST_ROOT` when that environment variable is set.
+Optional frontend checks require Node.js, which the application itself does not:
+
+```sh
+node tests/test_catalog.cjs
+node --check public/app.js
+node --check public/specimen.js
+node --check public/graph.js
+```
+
+`server.py` handles disk persistence, validation, imports and the local HTTP API.
+`public/` contains the browser interface. The SVG wordmark is also provided as
+`Tumbleweed-wordmark.svg`. Source references and imported HTML are escaped in the UI.
+
+## Share the application
+
+Publish this source directory as a new repository. There is no inherited Git
+history or configured remote. Review the staged files before pushing.
+Do not add your runtime data or exported backups to the repository.
+
+To make a source-only release:
+
+```sh
+python scripts/package_release.py
+```
+
+This creates `dist/tumbleweed.zip` from the explicit `RELEASE_FILES.txt` allowlist.
+Runtime files, local data and Git history are never included by that command.
+When adding public source files, add them deliberately to the allowlist.
+
+## License
+
+[MIT](LICENSE). The application source and original bundled SVG artwork use
+the same license. Imported content remains subject to its own rights.

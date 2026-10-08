@@ -1,0 +1,29 @@
+# Local knowledge and all prior versions
+/data/
+/bundle/
+/backups/
+/exports/
+/private/
+/test-results/
+**/workspace.json
+**/workspace.pending
+**/server.lock
+*.log
+*.pid
+tumbleweed-backup-*.json
+
+# Build output, caches, local settings and credentials
+/dist/
+*.zip
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+node_modules/
+.env
+.env.*
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
