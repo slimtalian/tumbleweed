@@ -71,7 +71,10 @@ test('oversized demo workspaces are rejected before commit',()=>{
 test('Pages assets work under a repository subpath and use only local scripts',()=>{
  const html=fs.readFileSync(path.join(root,'docs/index.html'),'utf8');
  assert.ok(!/\b(?:src|href)="(?:\/|\.\.\/)/.test(html));assert.ok(html.includes('./demo-store.js'));
- for(const [,asset] of html.matchAll(/\b(?:src|href)="\.\/([^"]+)"/g))assert.ok(fs.existsSync(path.join(root,'docs',asset)),asset);
+ for(const [,asset] of html.matchAll(/\b(?:src|href)="\.\/([^"]+)"/g)){
+  const [name,version]=asset.split('?v=');assert.ok(fs.existsSync(path.join(root,'docs',name)),asset);
+  assert.equal(version,require('node:crypto').createHash('sha256').update(fs.readFileSync(path.join(root,'docs',name))).digest('hex').slice(0,12));
+ }
  for(const css of ['style.css','specimen.css','demo.css'])assert.ok(!/url\(['"]?\//.test(fs.readFileSync(path.join(root,'docs',css),'utf8')));
  assert.ok(fs.existsSync(path.join(root,'docs/.nojekyll')));
 });
