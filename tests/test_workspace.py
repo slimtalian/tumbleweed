@@ -349,6 +349,12 @@ class WorkspaceTests(unittest.TestCase):
             r = c.getresponse(); self.assertEqual(r.status, 403); r.read()
             c.request('POST', '/api/mutate', body, {'Content-Type': 'application/json', 'X-Tumbleweed-Token': token})
             r = c.getresponse(); self.assertEqual(r.status, 200); r.read()
+            for route, mime in [('/context.js', 'text/javascript'), ('/context-ui.js', 'text/javascript'), ('/context.css', 'text/css')]:
+                c.request('GET', route)
+                response = c.getresponse()
+                self.assertEqual(response.status, 200)
+                self.assertTrue(response.getheader('Content-Type').startswith(mime))
+                self.assertTrue(response.read())
             c.request('GET', '/data/workspace.json')
             r = c.getresponse(); self.assertEqual(r.status, 404); r.read()
             c.request('GET', '/api/state', headers={'Host': 'evil.example'})
