@@ -1,6 +1,7 @@
 """Build a dependency-free Pages demo from the public application, never private data."""
 from pathlib import Path
 import json
+import hashlib
 import re
 import shutil
 
@@ -114,6 +115,13 @@ def build():
     for source,target in [('model.js','demo-model.js'),('store.js','demo-store.js'),('ui.js','demo-ui.js'),('demo.css','demo.css')]:shutil.copyfile(ROOT/'demo'/source,destination/target)
     (destination/'demo-data.js').write_text("'use strict';\nconst TumbleweedDemoSeed="+json.dumps(sample_workspace(),ensure_ascii=False,separators=(',',':'))+';\n',encoding='utf8')
     (destination/'.nojekyll').write_text('',encoding='utf8')
+    # Each deployment requests changed assets even when the browser cached the previous build.
+    index=destination/'index.html'
+    def version_asset(match):
+        name=match.group(2)
+        digest=hashlib.sha256((destination/name).read_bytes()).hexdigest()[:12]
+        return f'{match.group(1)}="./{name}?v={digest}"'
+    index.write_text(re.sub(r'(src|href)="\./([^"?]+)"',version_asset,index.read_text(encoding='utf8')),encoding='utf8')
     print('Built GitHub Pages demo:',len(sample_workspace()['records']),'fictional records; no private input read.')
 
 
