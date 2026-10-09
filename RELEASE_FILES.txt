@@ -42,3 +42,10 @@ docs/demo-ui.js
 docs/demo.css
 docs/demo-data.js
 docs/.nojekyll
+public/context.js
+public/context-ui.js
+public/context.css
+docs/context.js
+docs/context-ui.js
+docs/context.css
+tests/test_context.cjs
