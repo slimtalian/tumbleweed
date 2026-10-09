@@ -69,7 +69,7 @@ function createTumbleweedGraph(canvas, records, edges, onOpen, options={}) {
   for(const [key,target] of Object.entries({yaw,pitch,roll,zoom})){const gap=target-shown[key];if(Math.abs(gap)<.0001)shown[key]=target;else{shown[key]+=gap*blend;settling=true;}}
   paint();if(settling||Object.values(velocity).some(v=>v!==0)&&!drag)frame=requestAnimationFrame(animate);
  }
- const pauseMotion=()=>{stopMotion();Object.assign(shown,{yaw,pitch,roll,zoom});};
+ const pauseMotion=()=>{cancelHold();stopMotion();Object.assign(shown,{yaw,pitch,roll,zoom});};
  document.addEventListener('visibilitychange',pauseMotion);
  reducedMotion?.addEventListener('change',pauseMotion);
  function paint(){
@@ -82,14 +82,15 @@ function createTumbleweedGraph(canvas, records, edges, onOpen, options={}) {
   if(texture&&nodes.length){for(const fiber of fibers){const ps=fiber.path.map(project),depth=ps.reduce((n,p)=>n+p.z,0)/ps.length;ctx.beginPath();ctx.moveTo(ps[0].x,ps[0].y);for(let i=1;i<ps.length-1;i++){const p=ps[i],next=ps[i+1];ctx.quadraticCurveTo(p.x,p.y,(p.x+next.x)/2,(p.y+next.y)/2);}ctx.lineTo(ps.at(-1).x,ps.at(-1).y);ctx.lineWidth=fiber.weight;ctx.strokeStyle=`rgba(193,157,101,${fiber.alpha*(.82+(depth+1)*.28)*(active?.62:1)})`;ctx.stroke();}}
   if(options.specimen){
    const handles=[...parent.querySelectorAll('[data-thread]')];
-   handles.forEach((b,i)=>{const angle=-Math.PI*.85+i/groups.length*Math.PI*2,side=Math.cos(angle)<0?-1:1;
+   handles.forEach(b=>{
+    const origin=centers.get(b.dataset.thread);if(!origin)return;
+    const center=project(origin),anchor=project(mul(origin,1.65)),side=anchor.x<width/2?-1:1;
     b.classList.toggle('west',side<0);
-    const compact=window.innerWidth<=760,labelWidth=b.offsetWidth;
-    const rawX=width/2+Math.cos(angle)*Math.min(width*.34,height*.43);
-    const x=Math.max(side<0?labelWidth+4:4,Math.min(width-(side>0?labelWidth+4:4),rawX));
-    const y=height*(compact?.46:.48)+Math.sin(angle)*height*(compact?.32:.40);
-    b.style.left=x+'px';b.style.top=y+'px';
-    const center=project(centers.get(b.dataset.thread));ctx.beginPath();ctx.moveTo(center.x,center.y);ctx.quadraticCurveTo(x,y-15,x,y);ctx.lineWidth=options.collection===b.dataset.thread?1.5:.7;ctx.strokeStyle=options.collection===b.dataset.thread?'#c6ad72':'rgba(162,140,98,.25)';ctx.stroke();
+    const labelWidth=b.offsetWidth,labelHeight=b.offsetHeight||44;
+    const x=Math.max(side<0?labelWidth+4:4,Math.min(width-(side>0?labelWidth+4:4),anchor.x));
+    const y=Math.max(labelHeight/2+8,Math.min(height-72-labelHeight/2,anchor.y));
+    b.style.left=x+'px';b.style.top=y+'px';b.style.opacity=String(Math.max(.65,Math.min(1,.82+center.z*.2)));b.style.zIndex=String(Math.round(100+center.z*20));
+    ctx.beginPath();ctx.moveTo(center.x,center.y);ctx.quadraticCurveTo((center.x+x)/2,(center.y+y)/2-8,x,y);ctx.lineWidth=options.collection===b.dataset.thread?1.5:.7;ctx.strokeStyle=options.collection===b.dataset.thread?'#c6ad72':'rgba(162,140,98,.25)';ctx.stroke();
    });
   }
   positions=points.map(p=>({...project(p),r:p.r,size:p.r.kind==='project'?5.8:2.5+Math.min(3,(degree.get(p.r.id)||0)*.28)}));
@@ -99,7 +100,7 @@ function createTumbleweedGraph(canvas, records, edges, onOpen, options={}) {
   const ranked=[...positions].sort((a,b)=>(degree.get(b.r.id)||0)-(degree.get(a.r.id)||0));
   const featured=labels?(active?positions.filter(p=>related.has(p.r.id)).sort((a,b)=>(b.r.id===active)-(a.r.id===active)).slice(0,8):[...positions.filter(p=>p.r.kind==='project'),...ranked].filter((p,i,arr)=>arr.findIndex(a=>a.r.id===p.r.id)===i).slice(0,width<600?4:7)):hover?[hover]:[];
   const boxes=[];
-  for(const p of featured){let text=p.r.title;if(text.length>35)text=text.slice(0,34)+'â€¦';ctx.font=(p.r.id===active?'600 ':'500 ')+'12px Segoe UI';const tw=ctx.measureText(text).width;const x=Math.max(12,Math.min(width-tw-15,p.x+11));let y=p.y-5;for(let i=0;i<4&&boxes.some(b=>x<b.x+b.w&&x+tw>b.x&&Math.abs(y-b.y)<20);i++)y+=20;if(y>height-55||y<20)continue;boxes.push({x,y,w:tw});ctx.fillStyle='rgba(24,26,27,.9)';ctx.fillRect(x-4,y-13,tw+8,19);ctx.fillStyle=p.r.id===active?'#f4d49e':'#dddcd3';ctx.fillText(text,x,y);}
+  for(const p of featured){let text=p.r.title;if(text.length>35)text=text.slice(0,34)+'…';ctx.font=(p.r.id===active?'600 ':'500 ')+'12px Segoe UI';const tw=ctx.measureText(text).width;const x=Math.max(12,Math.min(width-tw-15,p.x+11));let y=p.y-5;for(let i=0;i<4&&boxes.some(b=>x<b.x+b.w&&x+tw>b.x&&Math.abs(y-b.y)<20);i++)y+=20;if(y>height-55||y<20)continue;boxes.push({x,y,w:tw});ctx.fillStyle='rgba(24,26,27,.9)';ctx.fillRect(x-4,y-13,tw+8,19);ctx.fillStyle=p.r.id===active?'#f4d49e':'#dddcd3';ctx.fillText(text,x,y);}
   if(!nodes.length){ctx.fillStyle='#a5a79f';ctx.font='15px Segoe UI';ctx.textAlign='center';ctx.fillText('No records match these filters.',width/2,height/2);ctx.textAlign='left';}
  }
  function resize(){width=parent.clientWidth;height=parent.clientHeight;const ratio=Math.min(2,window.devicePixelRatio||1);canvas.width=width*ratio;canvas.height=height*ratio;ctx.setTransform(ratio,0,0,ratio,0,0);schedulePaint();}
@@ -107,6 +108,8 @@ function createTumbleweedGraph(canvas, records, edges, onOpen, options={}) {
  const point=e=>{const bounds=canvas.getBoundingClientRect();return{x:e.clientX-bounds.left,y:e.clientY-bounds.top};};
  const hit=p=>[...positions].sort((a,b)=>b.z-a.z).find(a=>Math.hypot(a.x-p.x,a.y-p.y)<Math.max(a.size+7,window.innerWidth<=760?18:0));
  // The canvas owns gestures; the rest of the page remains scrollable.
+ let holdTimer=0,held=false,holdOrigin=null;
+ function cancelHold(){clearTimeout(holdTimer);holdTimer=0;holdOrigin=null;if(held){hover=null;held=false;schedulePaint();}}
  const pointers=new Map();let pinchDistance=0,pinchAngle=0,pinchCenter=null;
  const clampZoom=value=>Math.max(.35,Math.min(3,value));
  const distance=()=>{const [a,b]=[...pointers.values()];return a&&b?Math.hypot(a.x-b.x,a.y-b.y):0;};
@@ -114,16 +117,20 @@ function createTumbleweedGraph(canvas, records, edges, onOpen, options={}) {
  const originalTouchAction=canvas.style.touchAction;canvas.style.touchAction='none';
  canvas.onpointerdown=e=>{
   if(e.button!==0)return;
+  cancelHold();
   const interrupted=Object.values(velocity).some(v=>v!==0)&&!pointers.size;
   if(!pointers.size){stopMotion();({yaw,pitch,roll,zoom}=shown);}lastMove=performance.now();
   const p=point(e);pointers.set(e.pointerId,p);canvas.setPointerCapture(e.pointerId);
   drag={...p,start:p,moved:interrupted||pointers.size>1};pinchDistance=distance();pinchCenter=gesture();pinchAngle=pinchCenter?.angle||0;stopMotion();hover=null;
   canvas.style.cursor='grabbing';e.preventDefault();
+  if(e.pointerType==='touch'&&pointers.size===1){const node=hit(p);if(node){holdOrigin=p;holdTimer=setTimeout(()=>{holdTimer=0;if(disposed||pointers.size!==1||!pointers.has(e.pointerId)||!drag)return;held=true;drag.moved=true;hover=node;stopMotion();schedulePaint();},350);}}
+  schedulePaint();
  };
  canvas.onpointermove=e=>{
   const p=point(e);
   if(pointers.has(e.pointerId)){
    e.preventDefault();pointers.set(e.pointerId,p);
+   if(holdOrigin&&pointers.size===1){if(Math.hypot(p.x-holdOrigin.x,p.y-holdOrigin.y)<=8)return;cancelHold();}
    if(pointers.size>1){const next=distance();if(pinchDistance>0&&next>0)zoom=clampZoom(zoom*next/pinchDistance);const nextGesture=gesture();const twist=Math.atan2(Math.sin(nextGesture.angle-pinchAngle),Math.cos(nextGesture.angle-pinchAngle));if(pinchCenter)addRotation((nextGesture.x-pinchCenter.x)*.006,(nextGesture.y-pinchCenter.y)*.006,twist);pinchDistance=next;pinchAngle=nextGesture.angle;pinchCenter=nextGesture;drag.moved=true;}
    else if(drag){addRotation((p.x-drag.x)*.006,(p.y-drag.y)*.006,0);drag.moved ||= Math.hypot(p.x-drag.start.x,p.y-drag.start.y)>4;drag.x=p.x;drag.y=p.y;}
    hover=null;
@@ -136,6 +143,7 @@ function createTumbleweedGraph(canvas, records, edges, onOpen, options={}) {
  function finishPointer(e,cancelled=false){
   if(!pointers.has(e.pointerId))return;
   const selected=!cancelled&&pointers.size===1&&drag&&!drag.moved?hit(point(e)):null;
+  cancelHold();
   pointers.delete(e.pointerId);pinchDistance=distance();pinchCenter=gesture();pinchAngle=pinchCenter?.angle||0;
   if(cancelled||selected||pointers.size||performance.now()-lastMove>90||reducedMotion?.matches)stopMotion();
   const remaining=pointers.values().next().value;drag=remaining?{...remaining,start:remaining,moved:true}:null;
@@ -146,9 +154,10 @@ function createTumbleweedGraph(canvas, records, edges, onOpen, options={}) {
  canvas.onpointercancel=e=>finishPointer(e,true);
  canvas.onlostpointercapture=e=>finishPointer(e,true);
  canvas.onpointerleave=()=>{if(hover){hover=null;schedulePaint();}};
- const wheel=e=>{e.preventDefault();stopMotion();const delta=e.deltaY*(e.deltaMode===1?16:e.deltaMode===2?height:1);zoom=clampZoom(zoom*Math.exp(-delta*.0015));schedulePaint();};
+ const wheel=e=>{e.preventDefault();cancelHold();stopMotion();const delta=e.deltaY*(e.deltaMode===1?16:e.deltaMode===2?height:1);zoom=clampZoom(zoom*Math.exp(-delta*.0015));schedulePaint();};
  canvas.addEventListener('wheel',wheel,{passive:false});
+ canvas.oncontextmenu=e=>{if(held||holdOrigin)e.preventDefault();};
  document.querySelector('#rotate-left').onclick=()=>{stopMotion();yaw-=.25;schedulePaint();};document.querySelector('#rotate-right').onclick=()=>{stopMotion();yaw+=.25;schedulePaint();};document.querySelector('#zoom-in').onclick=()=>{zoom=Math.min(3,zoom+.15);schedulePaint();};document.querySelector('#zoom-out').onclick=()=>{zoom=Math.max(.35,zoom-.15);schedulePaint();};document.querySelector('#graph-reset').onclick=()=>{stopMotion();yaw=.18;pitch=-.12;roll=0;zoom=1;focus='';document.querySelector('#graph-focus').value='';schedulePaint();};
  document.querySelector('#graph-labels').onchange=e=>{labels=e.target.checked;schedulePaint();};document.querySelector('#graph-texture').onchange=e=>{texture=e.target.checked;schedulePaint();};document.querySelector('#graph-focus').onchange=e=>{focus=e.target.value;schedulePaint();};
- return ()=>{disposed=true;stopMotion();document.removeEventListener('visibilitychange',pauseMotion);reducedMotion?.removeEventListener('change',pauseMotion);pointers.clear();canvas.removeEventListener('wheel',wheel);canvas.style.touchAction=originalTouchAction;cancelAnimationFrame(frame);frame=0;drag=null;graphCamera={yaw:shown.yaw,pitch:shown.pitch,roll:shown.roll,zoom:shown.zoom,labels,texture};observer.disconnect();for(const event of ['onpointerdown','onpointermove','onpointerup','onpointercancel','onlostpointercapture','onpointerleave'])canvas[event]=null;};
+ return ()=>{disposed=true;cancelHold();stopMotion();document.removeEventListener('visibilitychange',pauseMotion);reducedMotion?.removeEventListener('change',pauseMotion);pointers.clear();canvas.removeEventListener('wheel',wheel);canvas.style.touchAction=originalTouchAction;cancelAnimationFrame(frame);frame=0;drag=null;graphCamera={yaw:shown.yaw,pitch:shown.pitch,roll:shown.roll,zoom:shown.zoom,labels,texture};observer.disconnect();for(const event of ['onpointerdown','onpointermove','onpointerup','onpointercancel','onlostpointercapture','onpointerleave','oncontextmenu'])canvas[event]=null;};
 }
