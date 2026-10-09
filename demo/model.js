@@ -6,13 +6,16 @@ const TumbleweedDemoModel=(()=>{
  const stamp=()=>new Date().toISOString();
  const uid=prefix=>prefix+crypto.randomUUID();
  const kinds=new Set(['project','note','experience','resource','decision']);
- const fields=['title','summary','topics','kind','status','next_action','stopped_at','put_away','tasks','url','collection'];
+ const fields=['title','summary','topics','kind','status','next_action','stopped_at','put_away','tasks','url','collection','decision_rationale','decision_alternatives','decision_review_on'];
  const object=value=>value!==null&&typeof value==='object'&&!Array.isArray(value);
  function display(value){
   require(object(value),'Invalid record or annotations.');
   for(const field of fields.filter(key=>!['topics','tasks'].includes(key)))require(value[field]===undefined||typeof value[field]==='string',field+' must be text.');
   require(value.topics===undefined||Array.isArray(value.topics)&&value.topics.every(t=>typeof t==='string'),'Topics must be text.');
+  require(!value.decision_review_on||/^\d{4}-\d{2}-\d{2}$/.test(value.decision_review_on)&&new Date(value.decision_review_on+'T00:00:00Z').toISOString().slice(0,10)===value.decision_review_on,'Decision review date must be YYYY-MM-DD.');
   require(value.tasks===undefined||Array.isArray(value.tasks)&&value.tasks.every(t=>object(t)&&typeof t.text==='string'&&typeof t.done==='boolean'),'Invalid tasks.');
+  for(const task of value.tasks||[])require(task.context_id===undefined||typeof task.context_id==='string','Task context must be a record ID.');
+  for(const task of value.tasks||[])require(task.context_reason===undefined||typeof task.context_reason==='string','Task context reason must be text.');
   require(value.archived===undefined||typeof value.archived==='boolean','Archived must be true or false.');
  }
  function validate(state){
@@ -33,6 +36,7 @@ const TumbleweedDemoModel=(()=>{
     require(Array.isArray(r.raw.messages||[])&&(r.raw.messages||[]).every(m=>object(m)&&typeof m.text==='string'&&typeof m.role==='string'),'Invalid preserved messages.');
    }else{display(r);require(typeof r.title==='string'&&r.title.trim()&&kinds.has(r.kind),'Invalid local record.');}
   }
+  for(const r of Object.values(state.records))for(const task of (r.imported?r.annotations?.tasks:r.tasks)||[])if(task.context_id)require(state.records[task.context_id],'Missing task context record.');
   for(const s of Object.values(state.sources))require(object(s.raw)&&s.raw.sensitivity==='general'&&typeof s.raw.title==='string'&&s.id===s.namespace+'::'+s.raw.id&&s.external_id===s.raw.id,'Invalid preserved source.');
   for(const e of Object.values(state.edges)){
    require(state.records[e.from]&&state.records[e.to]&&e.from!==e.to,'Relationship has missing or identical endpoints.');
@@ -62,7 +66,7 @@ const TumbleweedDemoModel=(()=>{
     display(allowed);
     if(old?.imported){next.records[id].annotations={...old.annotations,...allowed,updated_at:stamp()};}
     else{require(kinds.has(allowed.kind),'Choose a valid record kind.');next.records[id]={...old,...allowed,id,imported:false,created_at:old?.created_at||stamp(),updated_at:stamp()};}
-    if(request.origin){require(available(next.records[request.origin]),'The original context is unavailable.');edge(next,request.origin,id,'Selected as context when starting this project.');}
+    if(request.origin){require(available(next.records[request.origin]),'The original context is unavailable.');edge(next,request.origin,id,'Selected as context when creating this record.');}
     break;
    }
    case 'archive-record':{
