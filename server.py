@@ -474,7 +474,7 @@ def make_handler(store):
             if route == '/api/backup':
                 with store.lock:
                     return self.send(store.state)
-            files = {'/specimen.js': ('specimen.js', 'text/javascript; charset=utf-8'), '/specimen.css': ('specimen.css', 'text/css; charset=utf-8'), '/': ('index.html', 'text/html; charset=utf-8'), '/app.js': ('app.js', 'text/javascript; charset=utf-8'), '/catalog.js': ('catalog.js', 'text/javascript; charset=utf-8'), '/graph.js': ('graph.js', 'text/javascript; charset=utf-8'), '/style.css': ('style.css', 'text/css; charset=utf-8'), '/favicon.svg': ('favicon.svg', 'image/svg+xml')}
+            files = {'/context.js': ('context.js', 'text/javascript; charset=utf-8'), '/context-ui.js': ('context-ui.js', 'text/javascript; charset=utf-8'), '/context.css': ('context.css', 'text/css; charset=utf-8'), '/specimen.js': ('specimen.js', 'text/javascript; charset=utf-8'), '/specimen.css': ('specimen.css', 'text/css; charset=utf-8'), '/': ('index.html', 'text/html; charset=utf-8'), '/app.js': ('app.js', 'text/javascript; charset=utf-8'), '/catalog.js': ('catalog.js', 'text/javascript; charset=utf-8'), '/graph.js': ('graph.js', 'text/javascript; charset=utf-8'), '/style.css': ('style.css', 'text/css; charset=utf-8'), '/favicon.svg': ('favicon.svg', 'image/svg+xml')}
             if route in files:
                 name, mime = files[route]
                 return self.send((ROOT / 'public' / name).read_bytes(), mime=mime)
