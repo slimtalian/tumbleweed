@@ -33,10 +33,18 @@ def require(condition, message):
         raise ValueError(message)
 
 def validate_display_fields(r):
-    for field in ('title', 'summary', 'collection', 'status', 'kind', 'coverage', 'url', 'next_action', 'stopped_at', 'put_away'):
+    for field in ('title', 'summary', 'collection', 'status', 'kind', 'coverage', 'url', 'next_action', 'stopped_at', 'put_away', 'decision_rationale', 'decision_alternatives', 'decision_review_on'):
         require(field not in r or isinstance(r[field], str), f'{field} must be text.')
     require(isinstance(r.get('topics', []), list) and all(isinstance(t, str) for t in r.get('topics', [])), 'Topics must be strings.')
     require(isinstance(r.get('tasks', []), list) and all(isinstance(t, dict) and isinstance(t.get('text'), str) and isinstance(t.get('done'), bool) for t in r.get('tasks', [])), 'Invalid tasks.')
+    for task in r.get('tasks', []):
+        require('context_id' not in task or isinstance(task['context_id'], str), 'Task context must be a record ID.')
+        require('context_reason' not in task or isinstance(task['context_reason'], str), 'Task context reason must be text.')
+    if r.get('decision_review_on'):
+        try:
+            datetime.strptime(r['decision_review_on'], '%Y-%m-%d')
+        except (ValueError, TypeError):
+            raise ValueError('Decision review date must be YYYY-MM-DD.')
     require('archived' not in r or isinstance(r['archived'], bool), 'Archived must be true or false.')
 
 def validate_graph(g):
@@ -117,7 +125,11 @@ def validate_state(s):
                 require(actual == expected, 'Imported evidence mapping has been changed.')
     for r in s['records'].values():
         require(isinstance(r.get('annotations', {}), dict), 'Invalid annotations.')
-        validate_display_fields(r.get('annotations', {}) if r.get('imported') else r)
+        display = r.get('annotations', {}) if r.get('imported') else r
+        validate_display_fields(display)
+        for task in display.get('tasks', []):
+            if task.get('context_id'):
+                require(task['context_id'] in s['records'], 'Missing task context record.')
         if not r.get('imported'):
             require(isinstance(r.get('title'), str) and r.get('kind') in ('project', 'note', 'experience', 'resource', 'decision'), 'Invalid local record.')
     for e in s['edges'].values():
@@ -246,9 +258,9 @@ class Store:
             key = value.get('id') or 'local::' + secrets.token_hex(12)
             old = self.state['records'].get(key)
             require(not value.get('id') or old is not None, 'This record no longer exists. Reload before editing.')
-            fields = ('title', 'summary', 'topics', 'kind', 'status', 'next_action', 'stopped_at', 'put_away', 'tasks', 'url', 'collection')
+            fields = ('title', 'summary', 'topics', 'kind', 'status', 'next_action', 'stopped_at', 'put_away', 'tasks', 'url', 'collection', 'decision_rationale', 'decision_alternatives', 'decision_review_on')
             allowed = {k: value[k] for k in fields if k in value}
-            for field in ('title', 'summary', 'next_action', 'stopped_at', 'put_away', 'url', 'collection'):
+            for field in ('title', 'summary', 'next_action', 'stopped_at', 'put_away', 'url', 'collection', 'decision_rationale', 'decision_alternatives', 'decision_review_on'):
                 require(isinstance(allowed.get(field, ''), str), f'{field} must be text.')
             require(bool(allowed.get('title', '').strip()), 'A title is required.')
             require((old and old.get('imported')) or allowed.get('kind') in ('project', 'note', 'experience', 'resource', 'decision'), 'Choose a valid kind.')
@@ -261,7 +273,7 @@ class Store:
             if req.get('origin'):
                 require(req['origin'] in self.state['records'] and req['origin'] != key, 'Original context record is unavailable.')
                 eid = 'local-edge::' + secrets.token_hex(12)
-                self.state['edges'][eid] = {'id': eid, 'from': req['origin'], 'to': key, 'relation': 'informs', 'basis': 'explicit', 'rationale': 'Selected as historical context when creating this local project.', 'created_at': now()}
+                self.state['edges'][eid] = {'id': eid, 'from': req['origin'], 'to': key, 'relation': 'informs', 'basis': 'explicit', 'rationale': 'Selected as context when creating this local record.', 'created_at': now()}
         elif action == 'gather':
             ids = req.get('ids')
             require(isinstance(ids, list) and 1 <= len(ids) <= 100 and all(isinstance(x, str) for x in ids), 'Select 1–100 records.')
