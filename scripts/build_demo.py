@@ -81,18 +81,22 @@ def sample_workspace():
             'tasks':[{'text':'Inspect the attached notes and sources','done':True},{'text':'Choose one small trial','done':number%2==0},{'text':'Run the trial and record what happened','done':False},{'text':'Write the next concrete action','done':False}],
             'next_action':['Sketch two possible bed locations','Inspect the loose joint and record it','Compare the three observation notes','Draft the invitation and a short supply list','Compare the cardboard shade footprints','Try the exit note after one work session'][number],
             'stopped_at':'Collected a few useful notes and identified the first question.','put_away':'Return the materials and keep the notebook with the project.','created_at':'2025-04-18T10:00:00Z','updated_at':'2025-04-18T10:00:00Z'}
+        state['records'][pid]['tasks'][0].update(context_id=f'sample::branch-{number}-note-0',context_reason='Read the observation before choosing the next trial.')
         for i in (0,2):relationship(f'project-{number}-context-{i}',f'sample::branch-{number}-note-{i}',pid,'informs','This sample record helps define a small first trial and its limits.')
         for i in (0,2,4):relationship(f'branch-{number}-link-{i}',f'branch-{number}-note-{i}',f'branch-{number}-note-{i+1}','related_to','These fictional notes examine different parts of the same small experiment.','explicit',True,f'source-branch-{number}-note-{i}')
         relationship(f'cross-{number}',f'sample::branch-{number}-note-5',f'sample::branch-{(number+1)%6}-note-0','related_to','A shared practice suggests a place to look. It does not establish a dependency.','inferred')
         nid=f'local::reflection-{number}';state['records'][nid]={'id':nid,'kind':'decision' if number%2 else 'note','title':['Keep the first garden small','Repair structure before appearance','Leave uncertain sightings unresolved','Start with one small gathering','Test the use before the shape','Keep the pause ritual brief'][number],
             'summary':'Fictional reflection: choose a manageable next step, preserve the reasons, and revisit the choice after observing the result. Alternatives remain available; this is a sample commitment, not an instruction to the visitor.',
             'collection':collection,'topics':topics,'status':'reference','created_at':'2025-04-20T12:00:00Z','imported':False}
+        if number%2:
+            state['records'][nid].update(status='planned',decision_rationale='Keep the first trial small enough to observe and revise.',decision_alternatives='Begin with the entire project; defer until every uncertainty is resolved.',decision_review_on='2026-11-01')
+            relationship(f'decision-{number}-context',f'sample::branch-{number}-note-0',nid,'informs','The original note provides context for this sample proposal.')
     return state
 
 
 def build():
     destination=ROOT/'docs';destination.mkdir(exist_ok=True)
-    names=['index.html','app.js','catalog.js','graph.js','specimen.js','style.css','specimen.css','favicon.svg']
+    names=['index.html','app.js','catalog.js','graph.js','specimen.js','style.css','specimen.css','favicon.svg','context.js','context-ui.js','context.css']
     for name in names:
         text=(ROOT/'public'/name).read_text(encoding='utf8')
         if name=='index.html':
