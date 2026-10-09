@@ -94,7 +94,7 @@ function render() {
  } else if(view==='projects') {
   renderWorkshop(projects);
  } else if(view==='decisions') {
-  const own=list.filter(r=>r.kind==='decision'), historical=list.filter(r=>(r.raw?.claims || []).some(c=>/decision/.test(c.status)));
+  const own=list.filter(r=>r.kind==='decision'&&!r.imported), historical=list.filter(r=>(r.raw?.claims || []).some(c=>/decision/.test(c.status)));
   $('#content').innerHTML=`<div class="section-heading"><h2>Your decision notes</h2><button id="new-decision">+ Record a decision</button></div>${own.length?cards(own,false):'<div class="notice">Capture a decision with its reasons, alternatives and relevant evidence.</div>'}<div class="section-heading"><h2>Historical reported decisions</h2><span>Check the original source before relying on a summary</span></div>${cards(historical)}`;
   $('#new-decision').onclick=()=>edit(null,'decision');
  } else if(view==='discover') {renderDiscover(projects);}
@@ -154,7 +154,7 @@ function edit(id=null,kind='note',origin=null) {
  $('.form-grid',form).hidden=!!r.imported;form.elements.kind.disabled=!!r.imported;form.elements.status.disabled=!!r.imported;
  if(r.imported){form.elements.kind.value='note';form.elements.summary.value=r.annotations?.summary || '';}
  form.elements.topics.value=(r.topics || []).join(', ');form.elements.tasks.value=(r.tasks || []).map(t=>(t.done?'[x] ':'')+t.text).join('\n');
- $('#edit-note').textContent=r.imported?'Your edits are local annotations. The original imported record, claims and sources are preserved.':origin?'This creates a new project and links it to the historical record. It does not mark the old goal active.':'';
+ $('#edit-note').textContent=r.imported?'Your edits are local annotations. The original imported record, claims and sources are preserved.':origin?'This creates a separate record linked to the original context. Historical evidence remains intact.':'';
  $('.form-error',form).textContent='';showProjectFields();$('#editor').showModal();setTimeout(()=>form.elements.title.focus(),50);
 }
 function showProjectFields() {$('.project-fields').hidden=$('#edit-form').elements.kind.value!=='project';}
@@ -162,7 +162,7 @@ $('#edit-form').elements.kind.onchange=showProjectFields;
 $('#edit-form').onsubmit=async e=>{
  e.preventDefault();const form=e.currentTarget, data=Object.fromEntries(new FormData(form));
  if(form.elements.kind.disabled){delete data.kind;delete data.status;for(const key of ['tasks','stopped_at','next_action','put_away'])delete data[key];}
- data.topics=data.topics.split(',').map(t=>t.trim()).filter(Boolean);if(data.tasks!==undefined)data.tasks=data.tasks.split('\n').filter(t=>t.trim()).map(t=>({done:/^\[x\]/i.test(t),text:t.replace(/^\[x\]\s*/i,'').trim()}));
+ data.topics=data.topics.split(',').map(t=>t.trim()).filter(Boolean);if(data.tasks!==undefined)data.tasks=TumbleweedContext.parseTasks(data.tasks,data.id?get(data.id)?.tasks:[]);
  const before=new Set(Object.keys(state.records));const submit=$('button[type=submit]',form);submit.disabled=true;form.inert=true;
  try {await mutate({action:'save-record',record:data,origin:projectOrigin});const id=data.id||Object.keys(state.records).find(k=>!before.has(k));$('#editor').close();openRecord(id);toast('Saved in this browser.');}
  catch(err){showSaveError(form,err);}
