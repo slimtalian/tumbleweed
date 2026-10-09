@@ -82,3 +82,5 @@ dialog::backdrop{background:rgba(10,17,14,.7)}
  .page-heading{padding:16px 0}.page-heading p{margin-block:10px;line-height:1.6}
  .results-note{font-size:.75rem;line-height:1.6}
 }
+
+@media(min-width:761px){.specimen-table.unfolded .project-bookmarks{display:none}}
