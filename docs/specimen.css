@@ -21,7 +21,7 @@ body[data-view=graph] .toolbar.expanded>select,body[data-view=graph] .toolbar.ex
 .specimen-mark small{display:block;font-size:.64rem;color:#7d8a75;margin-top:7px}
 .specimen-map{position:relative;min-width:0;min-height:0}
 .specimen-map .graph-stage{height:100%;min-height:540px;background:none;position:relative}
-.specimen-map canvas{touch-action:pan-y}
+.specimen-map canvas{touch-action:none}
 .branch-handles{position:absolute;inset:0;pointer-events:none}
 .branch-handle{position:absolute;display:flex;align-items:center;gap:10px;padding:7px 10px 7px 0;border:0;background:none!important;border-radius:0;color:#bfc3a8;font-family:Georgia,serif;font-size:.95rem;font-weight:400;max-width:210px;text-align:left;line-height:1.35;transform:translate(var(--pull-x,0px),calc(-50% + var(--pull-y,0px)));pointer-events:auto;touch-action:none;cursor:grab;user-select:none}
 .branch-handle.west{transform:translate(calc(-100% + var(--pull-x,0px)),calc(-50% + var(--pull-y,0px)));flex-direction:row-reverse;text-align:right;padding:7px 0 7px 10px}
