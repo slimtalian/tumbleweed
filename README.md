@@ -22,6 +22,26 @@ GitHub Pages hosts the demo independently of your computer; it requires no runni
 Python server, paid service, account, or external AI API. The examples are invented
 and explicitly labeled as samples; their sources are not verified historical evidence.
 
+## Keep knowledge connected to action
+
+Open a record to follow **Nearby thoughts** and the **Reading trail**. Each connection
+retains its direction, explicit or inferred basis, and original rationale.
+
+Use **Record a decision** to preserve a reason, alternatives, and a review date.
+Choose Proposed, Accepted, Revisit, or Superseded deliberately. Imported historical
+records remain reference material. Review dates are prompts, not automatic reminders.
+
+Use **Use as a project step** to attach a concrete action and a reason to an existing
+project. The task links back to its source. Context is preserved when completing,
+reordering, or revising a task in place. When adding or removing several tasks at
+once, keep source-backed task wording unchanged so its identity remains unambiguous.
+Existing records gain these navigation tools immediately; no historical decisions
+are automatically promoted or rewritten.
+
+The design takes inspiration from [Tana](https://tana.inc/),
+[TheBrain](https://thebrain.com/), and [Kinopio](https://kinopio.club/), while retaining
+Tumbleweed's original artwork, local ownership, and source-aware knowledge model.
+
 ## Maintain the hosted demo
 
 The Pages publishing source is the **main** branch's **/docs** folder. Rebuild the
