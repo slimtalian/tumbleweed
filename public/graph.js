@@ -79,12 +79,12 @@ function createTumbleweedGraph(canvas, records, edges, onOpen, options={}) {
   for(const p of featured){let text=p.r.title;if(text.length>35)text=text.slice(0,34)+'…';ctx.font=(p.r.id===active?'600 ':'500 ')+'12px Segoe UI';const tw=ctx.measureText(text).width;const x=Math.max(12,Math.min(width-tw-15,p.x+11));let y=p.y-5;for(let i=0;i<4&&boxes.some(b=>x<b.x+b.w&&x+tw>b.x&&Math.abs(y-b.y)<20);i++)y+=20;if(y>height-55||y<20)continue;boxes.push({x,y,w:tw});ctx.fillStyle='rgba(24,26,27,.9)';ctx.fillRect(x-4,y-13,tw+8,19);ctx.fillStyle=p.r.id===active?'#f4d49e':'#dddcd3';ctx.fillText(text,x,y);}
   if(!nodes.length){ctx.fillStyle='#a5a79f';ctx.font='15px Segoe UI';ctx.textAlign='center';ctx.fillText('No records match these filters.',width/2,height/2);ctx.textAlign='left';}
  }
- function resize(){width=parent.clientWidth;height=parent.clientHeight;const ratio=window.devicePixelRatio||1;canvas.width=width*ratio;canvas.height=height*ratio;ctx.setTransform(ratio,0,0,ratio,0,0);paint();}
+ function resize(){width=parent.clientWidth;height=parent.clientHeight;const ratio=Math.min(2,window.devicePixelRatio||1);canvas.width=width*ratio;canvas.height=height*ratio;ctx.setTransform(ratio,0,0,ratio,0,0);paint();}
  const observer=new ResizeObserver(resize);observer.observe(parent);
  const point=e=>{const bounds=canvas.getBoundingClientRect();return{x:e.clientX-bounds.left,y:e.clientY-bounds.top};};
- const hit=p=>[...positions].sort((a,b)=>b.z-a.z).find(a=>Math.hypot(a.x-p.x,a.y-p.y)<a.size+7);
+ const hit=p=>[...positions].sort((a,b)=>b.z-a.z).find(a=>Math.hypot(a.x-p.x,a.y-p.y)<Math.max(a.size+7,window.innerWidth<=760?18:0));
  canvas.onpointerdown=e=>{drag={...point(e),start:point(e),moved:false};canvas.setPointerCapture(e.pointerId);};
- canvas.onpointermove=e=>{const p=point(e);if(drag){yaw+=(p.x-drag.x)*.008;pitch+=(p.y-drag.y)*.008;drag.moved ||= Math.hypot(p.x-drag.start.x,p.y-drag.start.y)>4;drag.x=p.x;drag.y=p.y;hover=null;}else{hover=hit(p)||null;canvas.style.cursor=hover?'pointer':'grab';}paint();};
+ canvas.onpointermove=e=>{const p=point(e);if(drag){if(e.pointerType==='touch'&&Math.abs(p.y-drag.start.y)>Math.abs(p.x-drag.start.x))return;yaw+=(p.x-drag.x)*.008;pitch+=(p.y-drag.y)*.008;drag.moved ||= Math.hypot(p.x-drag.start.x,p.y-drag.start.y)>4;drag.x=p.x;drag.y=p.y;hover=null;}else{hover=hit(p)||null;canvas.style.cursor=hover?'pointer':'grab';}paint();};
  canvas.onpointerup=e=>{if(drag&&!drag.moved){const p=hit(point(e));if(p){focus=p.r.id;onOpen(p.r.id);}}drag=null;paint();};
  canvas.onpointercancel=()=>{drag=null;};canvas.onpointerleave=()=>{hover=null;paint();};
  canvas.onwheel=e=>{if(!e.ctrlKey)return;e.preventDefault();zoom=Math.max(.35,Math.min(3,zoom-e.deltaY*.001));paint();};
