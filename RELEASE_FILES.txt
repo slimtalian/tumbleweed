@@ -49,3 +49,4 @@ docs/context.js
 docs/context-ui.js
 docs/context.css
 tests/test_context.cjs
+tests/test_graph.cjs
