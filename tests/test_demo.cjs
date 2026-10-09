@@ -78,3 +78,14 @@ test('Pages assets work under a repository subpath and use only local scripts',(
  for(const css of ['style.css','specimen.css','demo.css'])assert.ok(!/url\(['"]?\//.test(fs.readFileSync(path.join(root,'docs',css),'utf8')));
  assert.ok(fs.existsSync(path.join(root,'docs/.nojekyll')));
 });
+
+
+test('decision context and source-backed steps survive backup and reject broken context',()=>{
+ const before=JSON.stringify(seed);const source='sample::branch-0-note-0';
+ const saved=change(seed,{action:'save-record',origin:source,record:{kind:'decision',title:'Bound the trial',status:'planned',decision_rationale:'Observe a small change',decision_alternatives:'Try the whole area',decision_review_on:'2026-11-01'}});
+ const decision=Object.values(saved.records).find(r=>r.title==='Bound the trial');assert.equal(decision.decision_rationale,'Observe a small change');assert.ok(Object.values(saved.edges).some(e=>e.to===decision.id&&e.from===source));
+ const project=saved.records['local::project-0'];const next=change(saved,{action:'save-record',record:{...project,tasks:[{text:'Observe',done:false,context_id:decision.id,context_reason:'Test this proposal'}]}});
+ model.validate(JSON.parse(JSON.stringify(next)));assert.equal(next.records[project.id].tasks[0].context_reason,'Test this proposal');assert.equal(JSON.stringify(seed),before);
+ assert.throws(()=>change(next,{action:'save-record',record:{...decision,decision_review_on:'2026-02-30'}}),/date/);
+ assert.throws(()=>change(next,{action:'save-record',record:{...project,tasks:[{text:'Bad',done:false,context_id:'missing'}]}}),/context record/);
+});
