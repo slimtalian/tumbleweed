@@ -37,6 +37,22 @@ class WorkspaceTests(unittest.TestCase):
         preview = self.store.preview(graph or fixture(), 'test')
         return self.mutate(action='import', token=preview['token'], accepted=accepted or [])
 
+    def test_decision_and_task_context_persist_and_reject_invalid_references(self):
+        self.import_graph()
+        raw = copy.deepcopy(self.store.state['records']['test::a']['raw'])
+        self.mutate(action='save-record', origin='test::a', record={'title': 'A bounded trial', 'kind': 'decision', 'status': 'planned', 'decision_rationale': 'Observe before expanding', 'decision_alternatives': 'Expand immediately', 'decision_review_on': '2026-11-01'})
+        decision = next(r for r in self.store.state['records'].values() if r.get('title') == 'A bounded trial')
+        self.mutate(action='save-record', record={'title': 'A project', 'kind': 'project', 'tasks': [{'text': 'Observe', 'done': False, 'context_id': decision['id'], 'context_reason': 'Test the proposal'}]})
+        self.assertEqual(Store(self.test_path).state, self.store.state)
+        self.assertEqual(raw, self.store.state['records']['test::a']['raw'])
+        before = copy.deepcopy(self.store.state)
+        with self.assertRaises(ValueError):
+            self.mutate(action='save-record', record={'title': 'Bad', 'kind': 'decision', 'decision_review_on': '2026-02-30'})
+        self.assertEqual(before, self.store.state)
+        with self.assertRaises(ValueError):
+            self.mutate(action='save-record', record={'title': 'Bad', 'kind': 'project', 'tasks': [{'text': 'Observe', 'done': False, 'context_id': 'missing'}]})
+        self.assertEqual(before, self.store.state)
+
     def test_first_run_is_empty_and_persists(self):
         self.assertEqual(self.store.state['revision'], 0)
         for group in ('records', 'sources', 'edges', 'bundles'):
