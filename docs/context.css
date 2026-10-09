@@ -53,3 +53,32 @@
 @media(max-width:760px){.reader-more{flex-basis:100%}.reader-more summary{min-height:44px;display:flex;align-items:center;cursor:pointer;color:var(--muted);font-size:.85rem}.reader-more summary:after{content:' ⌄';margin-left:8px}.reader-more[open]{display:flex;flex-wrap:wrap;gap:8px}.reader-more[open]>summary{width:100%}.reader-more button{margin-bottom:8px}}
 
 @media(max-width:760px){input,textarea,select,.toolbar select,#quick-task input{font-size:16px}.project-switcher label{min-width:0}}
+
+/* Quiet, consistent feedback without animating the reading surface. */
+:where(button,a,summary,input,select,textarea):focus-visible{outline:2px solid var(--amber);outline-offset:4px}
+:where(button,summary,a){-webkit-tap-highlight-color:transparent}
+button:disabled{cursor:default;opacity:.45}
+.tasks label{cursor:pointer;transition:background-color 160ms ease}
+.tasks label:hover{background:#bdab830b}
+.tasks input{accent-color:var(--amber);flex-shrink:0}
+.progress>span{transition:width 220ms ease}
+.thought-neighbors button,.project-bookmark,.branch-handle,.workspace-dock button{transition:background-color 160ms ease,border-color 160ms ease,color 160ms ease}
+.thought-neighbors button:hover,.project-bookmark:hover{background:#bdab8310;border-color:#bdab8355}
+.thought-neighbors button:active,.workspace-dock button:active{background:#bdab8320}
+dialog::backdrop{background:rgba(10,17,14,.7)}
+.detail-dialog .prose{line-height:1.8;overflow-wrap:anywhere}
+.thought-trail{overscroll-behavior-inline:contain;scrollbar-width:thin}
+@media(min-width:761px){.detail-actions button,.reader-more button{min-height:36px}.detail-dialog{scrollbar-width:thin}.thought-neighbors button{padding:14px}.work-paper{scroll-margin-top:24px}}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;transition:none!important;animation:none!important}}
+
+/* On a phone, knowledge comes before the optional filter controls. */
+@media(max-width:760px){
+ body:not([data-view=graph]) .toolbar{grid-template-columns:minmax(0,1fr) auto}
+ body:not([data-view=graph]) .toolbar .search{grid-column:1;min-width:0}
+ body:not([data-view=graph]) #filter-toggle{display:block;min-height:44px;padding:8px 10px;font-size:.8rem;border:0;background:none;color:var(--muted)}
+ body:not([data-view=graph]) .toolbar:not(.expanded)>select,body:not([data-view=graph]) .toolbar:not(.expanded)>.filters{display:none}
+ body:not([data-view=graph]) .toolbar.expanded>select{grid-column:1/-1}
+ .collection-shortcuts{display:none}
+ .page-heading{padding:16px 0}.page-heading p{margin-block:10px;line-height:1.6}
+ .results-note{font-size:.75rem;line-height:1.6}
+}
