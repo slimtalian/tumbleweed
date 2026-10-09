@@ -22,6 +22,13 @@ GitHub Pages hosts the demo independently of your computer; it requires no runni
 Python server, paid service, account, or external AI API. The examples are invented
 and explicitly labeled as samples; their sources are not verified historical evidence.
 
+## On a phone
+
+Tap a branch to open its records. The reader fills the available screen and returns
+you to your place when closed. Secondary record tools live under **More actions**.
+The bottom navigation stays clear of dialogs and gathered selections. Mobile forms
+use readable input sizes and keep unfinished drafts protected.
+
 ## Keep knowledge connected to action
 
 Open a record to follow **Nearby thoughts** and the **Reading trail**. Each connection
