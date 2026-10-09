@@ -1,6 +1,6 @@
-.demo-banner{position:fixed;left:28px;bottom:27px;z-index:21;display:flex;align-items:center;gap:13px;font-size:.57rem;letter-spacing:.1em;color:#b5ae92}
+.demo-banner{position:fixed;right:28px;top:88px;z-index:21;display:flex;align-items:center;gap:13px;font-size:.57rem;letter-spacing:.1em;color:#b5ae92}
 .demo-banner>span{border-left:2px solid #bba77c;padding-left:9px;line-height:1.8}
 .demo-banner button{padding:7px 0;font-size:.65rem;letter-spacing:0;color:#c4b489;border:0;background:transparent;text-decoration:underline;text-underline-offset:4px}
 .demo-help{margin-top:22px}.demo-help p{max-width:65ch}.demo-source-link{display:inline-block;margin-top:8px;color:#d1c29b}
-@media(max-width:1050px){.demo-banner{bottom:84px;left:22px}}
+@media(max-width:1050px){.demo-banner{top:auto;right:auto;bottom:84px;left:22px}}
 @media(max-width:700px){.demo-banner{left:19px;right:19px;bottom:76px;justify-content:space-between;background:#171c19ed;padding:4px 8px;border-radius:4px;font-size:.51rem}.demo-banner button{font-size:.62rem}body[data-view=graph] .specimen-table{min-height:620px}}
