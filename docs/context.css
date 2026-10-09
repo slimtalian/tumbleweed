@@ -1,1 +1,55 @@
 .context-neighborhood{margin:20px 0;padding:14px 0;border-block:1px solid #bba77c35}.thought-trail{display:flex;gap:7px;flex-wrap:wrap;align-items:center;margin-bottom:14px}.thought-trail button{font-size:.7rem;padding:3px 0;background:none;border:0;color:#b7ad8e}.thought-trail button[aria-current]{color:#e0cfaa}.thought-trail span{color:#827c67}.thought-neighbors{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:12px}.thought-neighbors button{text-align:left;display:grid;gap:7px;padding:13px;border:1px solid #bba77c35;background:#bba77c09;border-radius:3px}.thought-neighbors strong{font-family:Georgia,serif;font-weight:400;color:#d6ccb0}.thought-neighbors small,.thought-neighbors span{font-size:.72rem;color:#aaa68f;line-height:1.45}.decision-context{border-left:2px solid #bba77c;padding:4px 16px;margin:18px 0}.decision-context p{white-space:pre-wrap;line-height:1.6}.task-context-link{display:block;margin:0 0 12px 25px;border:0;padding:3px 0;background:none;color:#bbaa83;text-align:left;font-size:.73rem}#context-step{max-width:540px}#context-step-form label{display:grid;gap:6px;margin:14px 0}#context-step-form footer{display:flex;justify-content:flex-end;gap:10px}@media(max-width:650px){.thought-neighbors{grid-template-columns:1fr}}
+
+/* Phone workspace: one clear layer, readable controls, room for browser chrome. */
+@media(max-width:760px){
+ html,body{width:100%;min-width:0} .shell{width:100%;min-width:0} main,#content{min-width:0;max-width:100%}
+ body{--phone-bottom:calc(84px + env(safe-area-inset-bottom,0px));padding-bottom:0}
+ .sidebar,body[data-view=graph] .sidebar{width:100%;height:72px;padding:12px 14px;gap:8px;min-width:0}
+ .sidebar .brand{width:clamp(146px,calc(100vw - 154px),230px);min-width:0;padding:0;margin-right:auto}
+ .sidebar .capture{font-size:.8rem;min-height:44px;padding:9px 12px;margin:0;width:auto}
+ .sidebar-bottom{flex-shrink:0}.workspace-tools>summary{min-width:44px;min-height:44px;display:grid;place-items:center;padding:0!important;font-size:0}
+ .workspace-tools>nav{position:fixed;top:68px;right:12px;left:auto;width:min(290px,calc(100vw - 24px));max-height:calc(100dvh - 170px);overflow:auto;z-index:60}
+ .workspace-tools .local-badge{display:none!important}.workspace-tools nav button{min-height:44px}
+ .sidebar .workspace-dock{width:calc(100% - 24px);max-width:420px;bottom:calc(8px + env(safe-area-inset-bottom,0px));padding:5px;justify-content:space-around;z-index:40;background:#252d26f5}
+ .sidebar .workspace-dock button{flex:1;justify-content:center;min-width:0;min-height:48px;padding:8px 5px;font-size:.75rem;gap:5px}
+ main,body[data-view=graph] main{padding:0 14px calc(var(--phone-bottom) + 24px)}
+ main>header{height:auto;min-height:44px;padding:0;gap:12px}main>header button{min-height:44px;font-size:.75rem}
+ .page-heading{padding:16px 0}.page-heading h1,body[data-view=projects] .page-heading h1{font-size:clamp(1.9rem,8vw,2.5rem);line-height:1.13}.page-heading p{font-size:.85rem;max-width:none}
+ .toolbar{display:grid;grid-template-columns:1fr 1fr;gap:8px}.toolbar .search{grid-column:1/-1;min-width:0;width:100%;font-size:1rem}.toolbar .search input{font-size:16px;min-width:0;min-height:44px}
+ .toolbar select{width:100%;max-width:none;min-width:0;font-size:.85rem;min-height:44px}.toolbar .filters{grid-column:1/-1}.filters>div{position:static;width:100%;margin-top:8px;box-shadow:none}
+ body[data-view=graph] .toolbar{position:relative;top:auto;left:auto;right:auto;width:100%;transform:none;display:flex;flex-wrap:wrap;margin:2px 0 12px;padding:0}
+ body[data-view=graph] .toolbar .search{flex:1;min-width:0}body[data-view=graph] #filter-toggle{min-height:44px;padding:8px 10px;font-size:.8rem}
+ body[data-view=graph] .toolbar.expanded{left:auto;right:auto;border-radius:14px;padding:10px}body[data-view=graph] .toolbar.expanded>select{flex:1 1 44%;max-width:100%;font-size:.85rem}
+ .specimen-table,.specimen-table.unfolded,body[data-view=graph] .specimen-table{min-height:0;height:auto;gap:14px;width:100%}
+ .specimen-map{width:100%}.specimen-map .graph-stage{height:clamp(360px,57dvh,490px);min-height:0}.specimen-table.unfolded .graph-stage{height:260px}
+ .branch-handle,.unfolded .branch-handle{min-height:44px;max-width:105px;font-size:.76rem;touch-action:pan-y;line-height:1.25;padding-block:9px}.branch-handle small{display:none}
+ .specimen-mark{position:relative;top:auto;left:auto;margin:3px 0 -10px;font-size:.6rem}.specimen-mark small{font-size:.65rem}
+ .specimen-caption{font-size:.85rem;bottom:52px}.specimen-controls{bottom:2px;gap:16px}.specimen-controls>button,.map-tools>summary{min-height:44px;font-size:.8rem;padding:10px 4px}
+ .map-tool-body{width:min(290px,calc(100vw - 32px));max-height:60dvh;overflow:auto;bottom:48px;right:-10px}.map-tool-body .graph-controls{flex-wrap:wrap}.map-tool-body button{min-width:44px;min-height:44px!important}.map-tool-body select{font-size:16px}.map-tool-body label,.map-tool-body p{font-size:.8rem}
+ .unfolded-thread{margin:0;width:100%;max-height:none;min-height:0;padding:18px;scroll-margin-top:12px}.specimen-records{max-height:none;overflow:visible}.thread-heading h2{font-size:1.8rem;overflow-wrap:anywhere}.thread-heading>button{min-width:44px;min-height:44px}
+ .slip-read h3{font-size:1.2rem}.slip-read p{font-size:.9rem;line-height:1.6}.slip-read small{font-size:.65rem}.pick-record{min-height:44px;font-size:.8rem}.thread-pages button{min-width:44px;min-height:44px}
+ .project-bookmarks{display:grid;grid-template-columns:1fr;overflow:visible;gap:8px;max-width:100%;width:100%;padding:0}.project-bookmark{width:100%;min-width:0;max-width:none;min-height:64px;padding:12px 14px}.project-bookmark small{font-size:.78rem;line-height:1.4}.project-bookmark>div{min-width:0;overflow-wrap:anywhere}
+ .cards{gap:12px}.record-card{padding:20px 16px;min-height:0}.record-card h3{font-size:1.3rem}.record-card p{font-size:.9rem}.record-card .card-meta,.record-card .small-label{font-size:.72rem}.collection-shortcuts{gap:8px}.collection-shortcuts button{min-height:44px;font-size:.8rem}
+ .worktable{gap:24px;padding-top:14px}.work-paper{padding:20px;transform:none}.work-paper .prose,.task-paper .tasks label{font-size:.95rem}.tasks label{min-height:52px;align-items:center}.tasks input{width:22px;height:22px}.project-switcher label{display:grid;gap:8px}.project-switcher select{width:100%;max-width:none;font-size:16px;min-height:44px}.project-switcher button{min-height:44px;font-size:.8rem}
+ .task-context-link{font-size:.85rem;min-height:44px;margin-bottom:0}.task-context p{margin:0 0 14px 25px;font-size:.85rem}.pinned-evidence small,.pinned-evidence p{font-size:.8rem}.pinned-evidence button{min-height:44px;font-size:1.12rem}
+ dialog,.detail-dialog{inset:8px;margin:auto;width:calc(100% - 16px);max-width:none;max-height:calc(100dvh - 16px);height:auto;padding:18px;border-radius:12px;overscroll-behavior:contain;scroll-padding:16px}
+ .detail-dialog{height:calc(100dvh - 16px);margin:0;inset:8px}.dialog-head{gap:10px}.dialog-head>div{min-width:0}.dialog-head h2{overflow-wrap:anywhere}.dialog-head>button{flex-shrink:0;min-width:44px;min-height:44px;padding:4px}
+ dialog input:not([type=checkbox]),dialog select,dialog textarea{font-size:16px;width:100%;min-width:0}dialog .form-grid{grid-template-columns:1fr}dialog footer{position:sticky;bottom:-18px;margin-inline:-18px;padding:12px 18px calc(12px + env(safe-area-inset-bottom,0px));background:var(--surface);border-top:1px solid var(--line);gap:8px;z-index:2}dialog footer button{min-height:44px;white-space:normal}
+ .detail-actions{gap:8px}.detail-dialog .detail-actions button{min-height:44px;font-size:.8rem;flex:1 1 auto}.detail-dialog .prose{font-size:.95rem}.detail-section>details>summary,.thought-trail button,.context-neighborhood summary{min-height:44px;display:flex;align-items:center;font-size:.85rem}.thought-neighbors{grid-template-columns:1fr}.thought-neighbors small,.thought-neighbors span{font-size:.8rem}.thought-trail{gap:6px}.thought-trail button{padding:6px 8px;background:#bba77c0b;border-radius:5px;text-align:left}
+ body:has(dialog[open]){overflow:hidden}body:has(dialog[open]) .workspace-dock,body:has(dialog[open]) .demo-banner,body:has(dialog[open]) #gather-bar{visibility:hidden}
+ #gather-bar{left:12px;right:12px;transform:none;bottom:calc(var(--phone-bottom) + 2px);max-width:none;display:grid;grid-template-columns:1fr auto;gap:6px 12px;padding:10px 12px;white-space:normal;font-size:.85rem}#gather-save{grid-column:1/-1;min-height:44px;font-size:.85rem!important}#gather-clear{min-width:44px;min-height:44px;font-size:.8rem!important}
+ body:has(#gather-bar:not([hidden])) main{padding-bottom:calc(var(--phone-bottom) + 140px)}
+ #toast{max-width:calc(100% - 24px);bottom:calc(var(--phone-bottom) + 8px);font-size:.9rem;white-space:normal;overflow-wrap:anywhere}
+ button,a,summary{touch-action:manipulation}button:focus-visible,a:focus-visible,summary:focus-visible{outline:2px solid var(--amber)}
+}
+
+@media(max-width:760px){.sidebar .brand{flex:1 1 0;width:auto;max-width:230px}.workspace-tools>nav{right:24px}.map-tool-body{position:fixed;left:12px;right:24px;bottom:calc(var(--phone-bottom) + 8px);width:auto;transform:none}html{scrollbar-width:thin}.specimen-caption{white-space:normal;text-align:center;width:100%;padding-inline:20px}.thought-trail span{flex-shrink:0}}
+
+@media(max-width:760px){.detail-dialog .dialog-head{position:sticky;top:-18px;background:var(--surface);z-index:5;padding:12px 0;margin-top:-12px}.detail-dialog{scroll-padding-top:140px}.thought-neighbors button{min-height:64px}}
+
+@media(max-width:760px){html:has(dialog[open]){overflow:hidden}}
+
+@media(min-width:761px){.reader-more{display:contents}.reader-more>summary{display:none}}
+@media(max-width:760px){.reader-more{flex-basis:100%}.reader-more summary{min-height:44px;display:flex;align-items:center;cursor:pointer;color:var(--muted);font-size:.85rem}.reader-more summary:after{content:' ⌄';margin-left:8px}.reader-more[open]{display:flex;flex-wrap:wrap;gap:8px}.reader-more[open]>summary{width:100%}.reader-more button{margin-bottom:8px}}
+
+@media(max-width:760px){input,textarea,select,.toolbar select,#quick-task input{font-size:16px}.project-switcher label{min-width:0}}
