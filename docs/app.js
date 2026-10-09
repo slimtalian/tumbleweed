@@ -142,7 +142,7 @@ function openRecord(id,back=false) {
  $('#archive-record').onclick=async()=>{try{await mutate({action:'archive-record',id,archived:!r.archived});openRecord(id);toast(r.archived?'Record restored to the collection.':'Record archived. Its evidence and links are retained.');}catch(e){toast(e.message);}};
  $$('[data-task]').forEach(b=>b.onchange=async()=>{const tasks=structuredClone(r.tasks);tasks[Number(b.dataset.task)].done=b.checked;try{await mutate({action:'save-record',record:{...r,tasks}});openRecord(id);}catch(e){b.checked=!b.checked;toast(e.message);}});
  $$('[data-unlink]').forEach(b=>b.onclick=async()=>{if(await confirmAction('Remove this relationship?','Your previous browser workspace is retained before the change. The records themselves are retained.')){try{await mutate({action:'unlink',id:b.dataset.unlink});openRecord(id);}catch(e){toast(e.message);}}});
- if(!$('#detail').open)$('#detail').show();
+ if(!$('#detail').open){if(matchMedia('(max-width:760px)').matches)$('#detail').showModal();else $('#detail').show();}
  $('#detail').setAttribute('aria-label','Knowledge reader');
 }
 let projectOrigin=null;
