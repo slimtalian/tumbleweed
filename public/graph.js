@@ -85,12 +85,45 @@ function createTumbleweedGraph(canvas, records, edges, onOpen, options={}) {
  const observer=new ResizeObserver(resize);observer.observe(parent);
  const point=e=>{const bounds=canvas.getBoundingClientRect();return{x:e.clientX-bounds.left,y:e.clientY-bounds.top};};
  const hit=p=>[...positions].sort((a,b)=>b.z-a.z).find(a=>Math.hypot(a.x-p.x,a.y-p.y)<Math.max(a.size+7,window.innerWidth<=760?18:0));
- canvas.onpointerdown=e=>{if(e.button!==0||e.isPrimary===false)return;drag={...point(e),start:point(e),moved:false};canvas.setPointerCapture(e.pointerId);};
- canvas.onpointermove=e=>{const p=point(e);if(drag){if(e.pointerType==='touch'&&Math.abs(p.y-drag.start.y)>Math.abs(p.x-drag.start.x)){if(Math.hypot(p.x-drag.start.x,p.y-drag.start.y)>4)drag.moved=true;return;}yaw+=(p.x-drag.x)*.008;pitch+=(p.y-drag.y)*.008;drag.moved ||= Math.hypot(p.x-drag.start.x,p.y-drag.start.y)>4;drag.x=p.x;drag.y=p.y;hover=null;}else{const next=hit(p)||null;if(next?.r.id===hover?.r.id)return;hover=next;canvas.style.cursor=hover?'pointer':'grab';}schedulePaint();};
- canvas.onpointerup=e=>{if(drag&&!drag.moved){const p=hit(point(e));if(p){focus=p.r.id;onOpen(p.r.id);}}drag=null;schedulePaint();};
- canvas.onpointercancel=()=>{drag=null;};canvas.onpointerleave=()=>{hover=null;schedulePaint();};
- canvas.onwheel=e=>{if(!e.ctrlKey)return;e.preventDefault();zoom=Math.max(.35,Math.min(3,zoom-e.deltaY*.001));schedulePaint();};
+ // The canvas owns gestures; the rest of the page remains scrollable.
+ const pointers=new Map();let pinchDistance=0;
+ const clampZoom=value=>Math.max(.35,Math.min(3,value));
+ const distance=()=>{const [a,b]=[...pointers.values()];return a&&b?Math.hypot(a.x-b.x,a.y-b.y):0;};
+ const originalTouchAction=canvas.style.touchAction;canvas.style.touchAction='none';
+ canvas.onpointerdown=e=>{
+  if(e.button!==0)return;
+  const p=point(e);pointers.set(e.pointerId,p);canvas.setPointerCapture(e.pointerId);
+  drag={...p,start:p,moved:pointers.size>1};pinchDistance=distance();hover=null;
+  canvas.style.cursor='grabbing';e.preventDefault();
+ };
+ canvas.onpointermove=e=>{
+  const p=point(e);
+  if(pointers.has(e.pointerId)){
+   e.preventDefault();pointers.set(e.pointerId,p);
+   if(pointers.size>1){const next=distance();if(pinchDistance>0&&next>0)zoom=clampZoom(zoom*next/pinchDistance);pinchDistance=next;drag.moved=true;}
+   else if(drag){yaw+=(p.x-drag.x)*.008;pitch+=(p.y-drag.y)*.008;drag.moved ||= Math.hypot(p.x-drag.start.x,p.y-drag.start.y)>4;drag.x=p.x;drag.y=p.y;}
+   hover=null;
+  }else{
+   if(pointers.size)return;
+   const next=hit(p)||null;if(next?.r.id===hover?.r.id)return;hover=next;canvas.style.cursor=hover?'pointer':'grab';
+  }
+  schedulePaint();
+ };
+ function finishPointer(e,cancelled=false){
+  if(!pointers.has(e.pointerId))return;
+  const selected=!cancelled&&pointers.size===1&&drag&&!drag.moved?hit(point(e)):null;
+  pointers.delete(e.pointerId);pinchDistance=distance();
+  const remaining=pointers.values().next().value;drag=remaining?{...remaining,start:remaining,moved:true}:null;
+  canvas.style.cursor=remaining?'grabbing':'grab';
+  if(selected){focus=selected.r.id;onOpen(selected.r.id);}schedulePaint();
+ }
+ canvas.onpointerup=e=>finishPointer(e);
+ canvas.onpointercancel=e=>finishPointer(e,true);
+ canvas.onlostpointercapture=e=>finishPointer(e,true);
+ canvas.onpointerleave=()=>{if(hover){hover=null;schedulePaint();}};
+ const wheel=e=>{e.preventDefault();const delta=e.deltaY*(e.deltaMode===1?16:e.deltaMode===2?height:1);zoom=clampZoom(zoom*Math.exp(-delta*.0015));schedulePaint();};
+ canvas.addEventListener('wheel',wheel,{passive:false});
  document.querySelector('#rotate-left').onclick=()=>{yaw-=.25;schedulePaint();};document.querySelector('#rotate-right').onclick=()=>{yaw+=.25;schedulePaint();};document.querySelector('#zoom-in').onclick=()=>{zoom=Math.min(3,zoom+.15);schedulePaint();};document.querySelector('#zoom-out').onclick=()=>{zoom=Math.max(.35,zoom-.15);schedulePaint();};document.querySelector('#graph-reset').onclick=()=>{yaw=.18;pitch=-.12;zoom=1;focus='';document.querySelector('#graph-focus').value='';schedulePaint();};
  document.querySelector('#graph-labels').onchange=e=>{labels=e.target.checked;schedulePaint();};document.querySelector('#graph-texture').onchange=e=>{texture=e.target.checked;schedulePaint();};document.querySelector('#graph-focus').onchange=e=>{focus=e.target.value;schedulePaint();};
- return ()=>{disposed=true;cancelAnimationFrame(frame);frame=0;drag=null;graphCamera={yaw,pitch,zoom,labels,texture};observer.disconnect();for(const event of ['onpointerdown','onpointermove','onpointerup','onpointercancel','onpointerleave','onwheel'])canvas[event]=null;};
+ return ()=>{disposed=true;pointers.clear();canvas.removeEventListener('wheel',wheel);canvas.style.touchAction=originalTouchAction;cancelAnimationFrame(frame);frame=0;drag=null;graphCamera={yaw,pitch,zoom,labels,texture};observer.disconnect();for(const event of ['onpointerdown','onpointermove','onpointerup','onpointercancel','onlostpointercapture','onpointerleave'])canvas[event]=null;};
 }
