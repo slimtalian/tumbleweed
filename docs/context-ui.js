@@ -2,19 +2,22 @@
 // Context stays attached to existing records; the specimen remains the home view.
 $('#edit-form footer').insertAdjacentHTML('beforebegin',`<section class="decision-fields" hidden><h3>Keep the reason with the choice</h3><label>Why this choice?<textarea name="decision_rationale" rows="3" maxlength="4000"></textarea></label><label>Alternatives considered<textarea name="decision_alternatives" rows="2" maxlength="4000"></textarea></label><label>Review on<input name="decision_review_on" type="date"></label><p class="muted">Proposed is not accepted. Choose the status deliberately; original historical decisions remain reference material.</p></section>`);
 const baseProjectFields=showProjectFields;
-showProjectFields=function(){baseProjectFields();const form=$('#edit-form'),decision=form.elements.kind.value==='decision'&&!form.elements.kind.disabled;$('.decision-fields').hidden=!decision;
+showProjectFields=function(){baseProjectFields();const form=$('#edit-form');if(!form.elements.id.value)$('#editor-title').textContent='Capture '+label(form.elements.kind.value);const decision=form.elements.kind.value==='decision'&&!form.elements.kind.disabled;$('.decision-fields').hidden=!decision;
  for(const field of ['decision_rationale','decision_alternatives','decision_review_on'])form.elements[field].disabled=!decision;
  const labels=decision?['Unclassified','Proposed','Accepted','Revisit','Superseded']:['Reference','Planned','Active','Paused','Completed'];[...form.elements.status.options].forEach((o,i)=>o.textContent=labels[i]);
 };
+$('#edit-form').elements.kind.onchange=showProjectFields;
 const baseEdit=edit;
 edit=function(id=null,kind='note',origin=null){baseEdit(id,kind,origin);const r=id?get(id):{},form=$('#edit-form');for(const field of ['decision_rationale','decision_alternatives','decision_review_on'])form.elements[field].value=r[field]||'';if(!id&&kind==='decision'&&origin)form.elements.title.value='Decision: '+origin.title;};
 
+let readerPageScroll=0;
+$('#detail').addEventListener('close',()=>{if(readerPageScroll){window.scrollTo({top:readerPageScroll,behavior:'instant'});readerPageScroll=0;}});
 const baseOpenRecord=openRecord;
-openRecord=function(id,back=false){baseOpenRecord(id,back);const r=get(id);if(!r||!$('#detail').open)return;
+openRecord=function(id,back=false){if(!$('#detail').open&&matchMedia('(max-width:760px)').matches){readerPageScroll=window.scrollY;window.scrollTo({top:0,behavior:'instant'});}baseOpenRecord(id,back);$('#detail').scrollTop=0;const r=get(id);if(!r||!$('#detail').open)return;
  const nearby=TumbleweedContext.neighbors(id,state.edges,get),trail=[...recordTrail,id].slice(-7);
  const panel=document.createElement('section');panel.className='context-neighborhood';
  panel.innerHTML=`<nav class="thought-trail" aria-label="Reading trail">${trail.map((key,i)=>`<button data-trail="${esc(key)}" ${i===trail.length-1?'aria-current="page"':''}>${esc(short(get(key)?.title||'Unavailable',45))}</button>`).join('<span aria-hidden="true">→</span>')}</nav><details><summary>Nearby thoughts · ${nearby.length}</summary><div class="thought-neighbors">${nearby.slice(0,16).map(({edge,record,direction})=>`<button data-neighbor="${esc(record.id)}"><small>${direction==='outgoing'?'↗':'↙'} ${esc(label(edge.relation))} · ${esc(edge.basis)}${record.archived?' · archived':''}</small><strong>${esc(record.title)}</strong><span>${esc(short(edge.rationale,120))}</span></button>`).join('')||'<p class="muted">A connection begins with a reason.</p>'}</div>${nearby.length>16?'<p class="muted">The full list is in Relationships & backlinks below.</p>':''}</details>`;
- $('.detail-actions',$('#detail')).after(panel);
+ $('.prose',$('#detail')).after(panel);
  $$('[data-neighbor]',panel).forEach(b=>b.onclick=()=>openRecord(b.dataset.neighbor));
  $$('[data-trail]',panel).forEach(b=>b.onclick=()=>{const index=recordTrail.indexOf(b.dataset.trail);if(index>=0){recordTrail=recordTrail.slice(0,index);openRecord(b.dataset.trail,true);}});
  if(r.kind==='decision'){
@@ -23,6 +26,7 @@ openRecord=function(id,back=false){baseOpenRecord(id,back);const r=get(id);if(!r
  if(!r.archived){const choice=document.createElement('button');choice.textContent='Record a decision';choice.onclick=()=>edit(null,'decision',r);$('.detail-actions',$('#detail')).append(choice);
   if(r.kind!=='project'){const step=document.createElement('button');step.textContent='Use as a project step';step.onclick=()=>contextStep(r);$('.detail-actions',$('#detail')).append(step);}
  }
+ const actions=$('.detail-actions',$('#detail')),more=document.createElement('details');more.className='reader-more';more.open=!matchMedia('(max-width:760px)').matches;const summary=document.createElement('summary');summary.textContent='More actions';more.append(summary);for(const b of [...actions.children])if(!['edit-record','connect-record'].includes(b.id)&&!b.dataset.pick)more.append(b);if(more.children.length>1)actions.append(more);
 };
 
 document.body.insertAdjacentHTML('beforeend',`<dialog id="context-step"><form id="context-step-form"><div class="dialog-head"><h2>A step with its context</h2><button type="button" data-close="context-step" aria-label="Close project step">×</button></div><p id="context-step-source" class="muted"></p><label>Project<select name="project" required></select></label><label>Next concrete step<input name="step" maxlength="1000" required></label><label>Why does this knowledge matter?<textarea name="reason" rows="3" maxlength="4000" required></textarea></label><p class="form-error" role="alert"></p><footer><button type="button" data-close="context-step">Cancel</button><button type="submit" class="primary">Add step with context</button></footer></form></dialog>`);
