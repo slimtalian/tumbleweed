@@ -10,10 +10,21 @@ $('#edit-form').elements.kind.onchange=showProjectFields;
 const baseEdit=edit;
 edit=function(id=null,kind='note',origin=null){baseEdit(id,kind,origin);const r=id?get(id):{},form=$('#edit-form');for(const field of ['decision_rationale','decision_alternatives','decision_review_on'])form.elements[field].value=r[field]||'';if(!id&&kind==='decision'&&origin)form.elements.title.value='Decision: '+origin.title;};
 
-let readerPageScroll=0;
-$('#detail').addEventListener('close',()=>{if(readerPageScroll){window.scrollTo({top:readerPageScroll,behavior:'instant'});readerPageScroll=0;}});
+let readerPageScroll=0,readerOriginView='',readerResizeCloses=0;
+const readerPhone=matchMedia('(max-width:760px)');
+function resizeReader(){
+ const reader=$('#detail'),more=$('.reader-more');if(more)more.open=!readerPhone.matches;
+ if(!reader.open||document.querySelector('dialog:modal:not(#detail)')||reader.matches(':modal')===readerPhone.matches)return;
+ const scroll=reader.scrollTop,focused=document.activeElement;
+ if(readerPhone.matches){readerOriginView=view;readerPageScroll=window.scrollY;window.scrollTo({top:0,behavior:'instant'});}
+ readerResizeCloses++;reader.close();if(readerPhone.matches)reader.showModal();else reader.show();
+ reader.scrollTop=scroll;if(reader.contains(focused))focused.focus({preventScroll:true});
+}
+readerPhone.addEventListener('change',resizeReader);
+document.addEventListener('close',e=>{if(e.target.id!=='detail')resizeReader();},true);
+$('#detail').addEventListener('close',()=>{if(readerResizeCloses){readerResizeCloses--;return;}if(readerPageScroll&&view===readerOriginView)window.scrollTo({top:readerPageScroll,behavior:'instant'});readerPageScroll=0;readerOriginView='';});
 const baseOpenRecord=openRecord;
-openRecord=function(id,back=false){if(!$('#detail').open&&matchMedia('(max-width:760px)').matches){readerPageScroll=window.scrollY;window.scrollTo({top:0,behavior:'instant'});}baseOpenRecord(id,back);$('#detail').scrollTop=0;const r=get(id);if(!r||!$('#detail').open)return;
+openRecord=function(id,back=false){const target=get(id);if(target&&!(target.kind==='project'&&!target.imported&&!target.archived)&&!$('#detail').open&&readerPhone.matches){readerOriginView=view;readerPageScroll=window.scrollY;window.scrollTo({top:0,behavior:'instant'});}baseOpenRecord(id,back);$('#detail').scrollTop=0;const r=get(id);if(!r||!$('#detail').open)return;const readerHeading=$('#detail h2');readerHeading.id='record-heading';$('#detail').setAttribute('aria-labelledby','record-heading');
  const nearby=TumbleweedContext.neighbors(id,state.edges,get),trail=[...recordTrail,id].slice(-7);
  const panel=document.createElement('section');panel.className='context-neighborhood';
  panel.innerHTML=`<nav class="thought-trail" aria-label="Reading trail">${trail.map((key,i)=>`<button data-trail="${esc(key)}" ${i===trail.length-1?'aria-current="page"':''}>${esc(short(get(key)?.title||'Unavailable',45))}</button>`).join('<span aria-hidden="true">→</span>')}</nav><details><summary>Nearby thoughts · ${nearby.length}</summary><div class="thought-neighbors">${nearby.slice(0,16).map(({edge,record,direction})=>`<button data-neighbor="${esc(record.id)}"><small>${direction==='outgoing'?'↗':'↙'} ${esc(label(edge.relation))} · ${esc(edge.basis)}${record.archived?' · archived':''}</small><strong>${esc(record.title)}</strong><span>${esc(short(edge.rationale,120))}</span></button>`).join('')||'<p class="muted">A connection begins with a reason.</p>'}</div>${nearby.length>16?'<p class="muted">The full list is in Relationships & backlinks below.</p>':''}</details>`;
@@ -52,3 +63,5 @@ const discardStep=async()=>{if(await confirmAction('Discard this unfinished step
 stepDialog.addEventListener('cancel',e=>{if(saveBusy||modalDrafts.has('context-step')){e.preventDefault();if(!saveBusy)discardStep();}});
 document.addEventListener('click',e=>{if(e.target.closest('[data-close="context-step"]')&&modalDrafts.has('context-step')){e.preventDefault();e.stopImmediatePropagation();if(!saveBusy)discardStep();}},true);
 
+
+for(const dialog of document.querySelectorAll('dialog')){const heading=dialog.querySelector('h2');if(heading&&!dialog.hasAttribute('aria-labelledby')){heading.id ||= dialog.id+'-heading';dialog.setAttribute('aria-labelledby',heading.id);}}
