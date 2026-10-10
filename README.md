@@ -229,6 +229,8 @@ This creates `dist/tumbleweed.zip` from the explicit `RELEASE_FILES.txt` allowli
 Runtime files, local data and Git history are never included by that command.
 When adding public source files, add them deliberately to the allowlist.
 
+## Future Updates 
+TBA
 ## License
 
 [MIT](LICENSE). The application source and original bundled SVG artwork use
