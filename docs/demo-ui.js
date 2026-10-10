@@ -7,7 +7,7 @@ function renderImports(){
   const file=$('#demo-restore-file').files[0];if(!file)throw new Error('Choose a backup first.');if(file.size>8*1024*1024)throw new Error('The browser demo supports backups up to 8 MB. Use the local app for larger collections.');
   const backup=TumbleweedDemoModel.validate(JSON.parse(await file.text()));
   if(await confirmAction('Restore this browser workspace?',`Replace this demo copy with ${Object.keys(backup.records).length} records? Export your current workspace first if you want to keep it.`)){await mutate({action:'restore',backup});toast('Backup restored in this browser.');}
- }catch(error){$('#demo-error').textContent=error.message;}};
+ }catch(error){const box=$('#demo-error');if(box)box.textContent=error.message;else toast(error.message);}};
 }
 async function resetDemo(){
  if(editorDirty||modalDrafts.size||taskDrafts.size){toast('Save or close your unfinished drafts before resetting.');return;}
@@ -19,3 +19,4 @@ function renderGuide(){
  $('#content').innerHTML=`<article class="panel guide"><h2>Start with a branch.</h2><p>Pull a branch or search for “water”, “repair”, or “research”. Open a record to read the context and inspect its sources.</p><h2>Gather a reason to act.</h2><p>Select useful records with Gather, then add them to a new or existing project. Write why they matter. Open Make to manage the outcome, tasks and next step.</p><h2>Every sample is fictional.</h2><p>Notes, conversations, decisions and project progress were written for this demo. A source marked as a sample is an illustration, not independently verified evidence. Dashed connections are inferred associations; their reasons remain visible.</p><h2>Your copy stays with you.</h2><p>Saved changes stay in this browser's IndexedDB storage. Other visitors have separate workspaces. Export a backup to keep a portable copy. Resetting or clearing site data starts over. If storage is unavailable, the demo works for this tab only and says so in its save status.</p><h2>Use Tumbleweed locally.</h2><p>The local application starts empty and lets you import selected Markdown files, vault ZIPs and curated graph bundles. It stores your workspace on your own computer.</p><p><a href="https://github.com/slimtalian/tumbleweed" target="_blank" rel="noopener noreferrer">Source and setup instructions ↗</a></p></article>`;
 }
 $('#demo-banner-reset').onclick=resetDemo;
+

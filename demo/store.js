@@ -2,16 +2,33 @@
 // Static hosting serves the UI. IndexedDB holds each visitor's own demo copy.
 const TumbleweedDemo=(()=>{
  const database='tumbleweed-demo-v1:'+location.pathname.replace(/index\.html$/,'');
- let dbPromise,memory=null,sessionOnly=false;
+ let dbPromise,activeDB=null,memory=null,sessionOnly=false,openedBefore=false;
  function open(){
-  if(!dbPromise)dbPromise=new Promise((resolve,reject)=>{
-   if(!window.indexedDB){reject(new Error('Browser storage is unavailable.'));return;}
+  if(sessionOnly)return Promise.resolve(null);
+  if(!dbPromise){
+   const attempt=new Promise((resolve,reject)=>{
+   if(!window.indexedDB){reject(Object.assign(new Error('Browser storage is unavailable.'),{name:'SecurityError'}));return;}
    const request=indexedDB.open(database,1);
+   let abandoned=false;
    request.onupgradeneeded=()=>request.result.createObjectStore('workspaces');
-   request.onsuccess=()=>{request.result.onversionchange=()=>request.result.close();resolve(request.result);};
+   request.onsuccess=()=>{
+    const db=request.result;
+    if(abandoned){db.close();return;}
+    activeDB=db;openedBefore=true;
+    const invalidate=()=>{if(activeDB===db){activeDB=null;dbPromise=null;}};
+    db.onversionchange=()=>{db.close();invalidate();};db.onclose=invalidate;
+    resolve(db);
+   };
    request.onerror=()=>reject(request.error);
-   request.onblocked=()=>reject(new Error('Close another open demo tab and reload.'));
-  }).catch(()=>{sessionOnly=true;memory=structuredClone(TumbleweedDemoSeed);return null;});
+   request.onblocked=()=>{abandoned=true;reject(new Error('Browser storage is busy. Close other Tumbleweed tabs, then reload. Your saved workspace has not been replaced.'));};
+  });
+   dbPromise=attempt.catch(error=>{
+    dbPromise=null;
+    // A transient failure must never disguise an existing workspace as a fresh demo.
+    if(!openedBefore&&error?.name==='SecurityError'){sessionOnly=true;memory=structuredClone(TumbleweedDemoSeed);return null;}
+    throw new Error('Could not open saved browser data. '+(error?.message||'Retry after reloading.'));
+   });
+  }
   return dbPromise;
  }
  async function transaction(write,request){

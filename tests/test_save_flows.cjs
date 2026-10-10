@@ -40,3 +40,9 @@ test('a second confirmation cannot replace or inherit the first approval',async(
  const first=ctx.confirmAction('First','Original');assert.equal(await ctx.confirmAction('Second','Different'),false);
  assert.equal(nodes['#confirm-title'].textContent,'First');nodes['#confirm-yes'].onclick();assert.equal(await first,true);
 });
+test('an import error remains visible after navigating away from imports',()=>{
+ const messages=[],ctx={$:()=>null,toast:m=>messages.push(m)};vm.createContext(ctx);
+ const start=source.indexOf('function showImportError('),end=source.indexOf('\n',start);
+ vm.runInContext(source.slice(start,end),ctx);ctx.showImportError('Import failed');
+ assert.equal(messages[0],'Import failed');
+});
