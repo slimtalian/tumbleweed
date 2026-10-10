@@ -5,6 +5,7 @@
 @media(max-width:1050px){.demo-banner{top:auto;right:auto;bottom:84px;left:22px}}
 @media(max-width:700px){.demo-banner{left:19px;right:19px;bottom:76px;justify-content:space-between;background:#171c19ed;padding:4px 8px;border-radius:4px;font-size:.51rem}.demo-banner button{font-size:.62rem}body[data-view=graph] .specimen-table{min-height:620px}}
 
-@media(max-width:760px){.demo-banner{position:static;margin:0 14px;padding:6px 0;background:transparent;justify-content:space-between;min-height:38px;font-size:.6rem}.demo-banner button{min-height:44px;font-size:.75rem}body:has(dialog[open]) .demo-banner{display:none}body[data-view=graph] .specimen-table{min-height:0}}
+@media(max-width:1050px){.demo-banner{position:static;margin:0 14px;padding:6px 0;background:transparent;justify-content:space-between;min-height:38px;font-size:.6rem}.demo-banner button{min-height:44px;font-size:.75rem}body:has(dialog[open]) .demo-banner{display:none}}
+@media(max-width:760px){body[data-view=graph] .specimen-table{min-height:0}}
 
 @media(min-width:1051px){.demo-banner{top:auto;bottom:18px;right:24px}}
