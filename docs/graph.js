@@ -131,7 +131,7 @@ function createTumbleweedGraph(canvas, records, edges, onOpen, options={}) {
   if(pointers.has(e.pointerId)){
    e.preventDefault();pointers.set(e.pointerId,p);
    if(holdOrigin&&pointers.size===1){if(Math.hypot(p.x-holdOrigin.x,p.y-holdOrigin.y)<=8)return;cancelHold();}
-   if(pointers.size>1){const next=distance();if(pinchDistance>0&&next>0)zoom=clampZoom(zoom*next/pinchDistance);const nextGesture=gesture();const twist=Math.atan2(Math.sin(nextGesture.angle-pinchAngle),Math.cos(nextGesture.angle-pinchAngle));if(pinchCenter)addRotation((nextGesture.x-pinchCenter.x)*.006,(nextGesture.y-pinchCenter.y)*.006,twist);pinchDistance=next;pinchAngle=nextGesture.angle;pinchCenter=nextGesture;drag.moved=true;}
+   if(pointers.size>1){const next=distance();if(pinchDistance>0&&next>0){zoom=clampZoom(zoom*next/pinchDistance);shown.zoom=zoom;}const nextGesture=gesture();const twist=Math.atan2(Math.sin(nextGesture.angle-pinchAngle),Math.cos(nextGesture.angle-pinchAngle));if(pinchCenter)addRotation((nextGesture.x-pinchCenter.x)*.006,(nextGesture.y-pinchCenter.y)*.006,twist);pinchDistance=next;pinchAngle=nextGesture.angle;pinchCenter=nextGesture;drag.moved=true;}
    else if(drag){addRotation((p.x-drag.x)*.006,(p.y-drag.y)*.006,0);drag.moved ||= Math.hypot(p.x-drag.start.x,p.y-drag.start.y)>4;drag.x=p.x;drag.y=p.y;}
    hover=null;
   }else{
