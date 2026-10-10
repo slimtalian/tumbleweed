@@ -183,7 +183,7 @@ function link(from,to=null,rationale='') {
  form.elements.from.innerHTML=options;form.elements.to.innerHTML=options;form.elements.from.value=from || rows[0]?.id || '';form.elements.to.value=to || rows.find(r=>r.id!==from)?.id || '';form.elements.rationale.value=rationale;$('.form-error',form).textContent='';$('#link-dialog').showModal();
 }
 $('#link-form').onsubmit=async e=>{e.preventDefault();const form=e.currentTarget;const submit=$('button.primary',form);submit.disabled=true;form.inert=true;try{await mutate({action:'link',edge:Object.fromEntries(new FormData(form))});$('#link-dialog').close();if($('#detail').open)openRecord(selected);toast('Relationship saved with its rationale.');}catch(err){showSaveError(form,err);}finally{submit.disabled=false;form.inert=false;}};
-function confirmAction(title,text) {return new Promise(resolve=>{const d=$('#confirm-dialog');$('#confirm-title').textContent=title;$('#confirm-text').textContent=text;d.showModal();$('#confirm-yes').onclick=()=>{d.close();resolve(true);};$('#confirm-no').onclick=()=>{d.close();resolve(false);};d.oncancel=()=>resolve(false);});}
+function confirmAction(title,text) {if($('#confirm-dialog').open)return Promise.resolve(false);return new Promise(resolve=>{const d=$('#confirm-dialog');$('#confirm-title').textContent=title;$('#confirm-text').textContent=text;d.showModal();$('#confirm-yes').onclick=()=>{d.close();resolve(true);};$('#confirm-no').onclick=()=>{d.close();resolve(false);};d.oncancel=()=>resolve(false);});}
 function bindClose(root=document) {$$('[data-close]',root).forEach(b=>b.onclick=()=>$('#'+b.dataset.close).close());}
 function renderDiscover(projects) {
  $('#content').innerHTML=projects.length?`<section class="panel"><label for="discover-project">Choose a project</label> <select id="discover-project">${projects.map(p=>`<option value="${esc(p.id)}">${esc(p.title)}</option>`).join('')}</select><p class="muted">Suggestions compare exact shared topics. Existing connections and archived records are excluded. No AI or external service is used.</p></section><div id="suggestions" class="preview"></div>`:empty('Choose a project first','Create a project and give it topics. Discovery will show relevant knowledge and explain the shared topics.','<button id="discover-create" class="primary">Create a project</button>');
@@ -285,6 +285,18 @@ function renderWorkshop(projects){
  $$('[data-work-task]').forEach(b=>b.onchange=async()=>{const updated=structuredClone(tasks);updated[Number(b.dataset.workTask)].done=b.checked;try{await mutate({action:'save-record',record:{...p,tasks:updated}});if(view==='projects'&&activeProject===p.id)$('[data-work-task="'+b.dataset.workTask+'"]')?.focus({preventScroll:true});}catch(e){b.checked=!b.checked;toast(e.message);}});
  $('#task-text').value=taskDrafts.get(p.id)||'';
  $('#task-text').oninput=e=>{if(e.target.value)taskDrafts.set(p.id,e.target.value);else taskDrafts.delete(p.id);};
- $('#quick-task').onsubmit=async e=>{e.preventDefault();const input=$('#task-text'),text=input.value.trim();if(!text)return;const button=$('button',e.currentTarget);button.disabled=true;e.currentTarget.inert=true;taskDrafts.delete(p.id);try{await mutate({action:'save-record',record:{...p,tasks:[...tasks,{text,done:false}]}});if(view==='projects'&&activeProject===p.id)$('#task-text')?.focus({preventScroll:true});}catch(err){taskDrafts.set(p.id,input.value);$('.work-error').textContent=err.message;button.disabled=false;input.closest('form').inert=false;}};
+ $('#quick-task').onsubmit=async e=>{
+  e.preventDefault();const form=e.currentTarget,input=$('#task-text',form),draft=input.value,text=draft.trim();if(!text)return;
+  const button=$('button',form),errorBox=$('.work-error');button.disabled=true;form.inert=true;
+  // Keep the draft until the server confirms success; navigation may replace this form.
+  taskDrafts.set(p.id,draft);
+  try{
+   await mutate({action:'save-record',record:{...p,tasks:[...tasks,{text,done:false}]}});
+   if(taskDrafts.get(p.id)===draft){taskDrafts.delete(p.id);if(view==='projects'&&activeProject===p.id){const current=$('#task-text');if(current?.value===draft)current.value='';}}
+   if(view==='projects'&&activeProject===p.id)$('#task-text')?.focus({preventScroll:true});
+  }catch(err){if(form.isConnected&&errorBox?.isConnected)errorBox.textContent=err.message;else toast('Step not saved. Your draft is kept with this project. '+err.message);}
+  finally{button.disabled=false;form.inert=false;}
+ };
+
 }
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!document.querySelector('dialog:modal'))$('#detail').close();if(e.key==='/'&&!document.activeElement.isContentEditable&&!['INPUT','TEXTAREA','SELECT'].includes(document.activeElement.tagName)&&!document.querySelector('dialog[open]')){e.preventDefault();if($('.toolbar').hidden)navigate('knowledge');$('#search').focus();}});
