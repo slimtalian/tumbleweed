@@ -137,8 +137,56 @@ round-trip through backup restore. Imports and ordinary save requests remain
 limited to 24 MB. The browser limits Markdown selections to 16 MB.
 
 The map draws up to 1,500 records; search and the reading view cover the complete
-collection. Backup snapshots currently keep every saved version, so their disk
-usage grows with use. No automatic pruning is performed.
+collection. Automatic snapshot retention is described below.
+
+### Automatic backup retention
+
+After a successful atomic workspace save, the Python app prunes older **managed
+automatic snapshots** in that workspace's `data/backups/` directory. Defaults:
+
+- Keep at most **50 snapshots**, with a **512 MiB** combined storage target.
+- Always preserve at least **5 snapshots** (when available), including the state
+  immediately before the latest save. This recovery floor overrides the byte
+  target: five maximum-size workspaces can occupy about 640 MiB.
+- Order by the UTC timestamp in the filename, not filesystem modification time.
+  A clock rollback cannot evict the snapshot just created.
+- Never prune on startup or after a failed save. Cleanup failures are logged;
+  they do not turn a committed save into a failure. A later save retries cleanup.
+
+Only files named `auto-YYYYMMDD-HHMMSS-microseconds-<16 hex characters>.json`
+are managed. This namespace is reserved for the app. Legacy timestamp-only backups,
+exports, unexpected/corrupt files, subdirectories, symbolic links, Windows reparse
+points and hard links are preserved. The backup directory itself must be a real
+directory inside the selected data folder. No recursive cleanup is performed.
+The limits apply to managed snapshots, not total directory size; preserved files,
+failed-save artifacts and locked files may consume additional space.
+
+**Upgrade:** existing backups remain untouched because their old names do not
+reliably distinguish automatic snapshots from user-preserved copies. New saves
+use the managed namespace. Review old snapshots manually if you need to reclaim
+their space, keeping a known-good exported backup elsewhere first. Place exports
+outside `data/backups/` and do not rename them into the reserved namespace.
+
+Configure the server with standard-library-only command-line options:
+
+```sh
+python server.py --backup-count 30 --backup-mib 256 --backup-minimum 5
+```
+
+Alternatively set `TUMBLEWEED_BACKUP_COUNT`, `TUMBLEWEED_BACKUP_MIB` and
+`TUMBLEWEED_BACKUP_MINIMUM` before starting the app; the Windows launcher inherits
+these environment variables. Command-line values take precedence. Restart the
+server after changing settings. Count must be at least the positive minimum;
+MiB must be positive. `--backup-count 0` disables pruning (snapshots still accrue).
+Invalid settings stop startup before the workspace is opened.
+
+Retention applies only to the local Python app. The GitHub Pages demo continues
+to use browser storage and manual JSON exports; it does not run this server.
+
+To update an existing installation, stop Tumbleweed, replace `server.py` with the
+updated source, then start it again. Keep `data/` intact. No migration or package
+installation is required. Automatic pruning begins only on the next successful
+save, and applies only to the new managed snapshots.
 
 This is a single-user, loopback-only application. It has no account login and is
 not intended to be exposed as a public server. GitHub can host the source;

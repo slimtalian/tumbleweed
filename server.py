@@ -1,5 +1,7 @@
 """Tumbleweed Local. Python standard library only; all writes stay on this computer."""
 import argparse
+import logging
+import stat
 import base64
 import copy
 import hashlib
@@ -143,8 +145,26 @@ def validate_state(s):
             require(isinstance(change, dict) and change.get('group') in ('records', 'sources', 'edges') and isinstance(change.get('id'), str) and isinstance(change.get('after_hash'), str) and 'before' in change, 'Invalid import change.')
     return s
 
+
+# Only the new reserved automatic-snapshot namespace is eligible for retention.
+# Legacy timestamp-only snapshots and user exports are intentionally unmanaged.
+AUTO_BACKUP = re.compile(r'auto-(\d{8}-\d{6}-\d{6})-[0-9a-f]{16}\.json')
+
+def plain_path(path, directory=False):
+    info = path.lstat()
+    linked = stat.S_ISLNK(info.st_mode) or getattr(info, 'st_file_attributes', 0) & 0x400
+    return not linked and (stat.S_ISDIR(info.st_mode) if directory else
+                          stat.S_ISREG(info.st_mode) and info.st_nlink == 1)
+
+def backup_policy(count, mib, minimum):
+    require(all(type(x) is int for x in (count, mib, minimum)), 'Backup settings must be integers.')
+    require(count >= 0 and mib >= 1 and minimum >= 1 and (count == 0 or count >= minimum),
+            'Backup count must be 0 (disable pruning) or at least the minimum; MiB and minimum must be positive.')
+    return count, mib * 1024 * 1024, minimum
+
 class Store:
-    def __init__(self, folder):
+    def __init__(self, folder, *, backup_count=50, backup_mib=512, backup_minimum=5):
+        self.backup_count, self.backup_bytes, self.backup_minimum = backup_policy(backup_count, backup_mib, backup_minimum)
         self.folder = Path(folder)
         self.folder.mkdir(parents=True, exist_ok=True)
         self.path = self.folder / 'workspace.json'
@@ -156,15 +176,88 @@ class Store:
             self.state = {'format': 'tumbleweed-local-1', 'revision': 0, 'records': {}, 'sources': {}, 'edges': {}, 'batches': [], 'bundles': {}}
             self.write()
 
+    def backup_directory(self):
+        backups = self.folder / 'backups'
+        backups.mkdir(exist_ok=True)
+        require(plain_path(backups, directory=True) and backups.resolve().parent == self.folder.resolve(),
+                'Backup directory must be a real directory inside the workspace data folder.')
+        return backups
+
+    def prune_backups(self, protected):
+        # Best effort AFTER atomic replacement. Cleanup errors must not roll back
+        # in-memory state after the new workspace is already committed to disk.
+        if not self.backup_count or protected is None:
+            return
+        try:
+            backups = self.backup_directory()
+            candidates = []
+            for entry in backups.iterdir():
+                match = AUTO_BACKUP.fullmatch(entry.name)
+                if not match or not plain_path(entry):
+                    continue
+                try:
+                    stamp = datetime.strptime(match[1], '%Y%m%d-%H%M%S-%f')
+                except ValueError:
+                    continue
+                info = entry.stat()
+                candidates.append((stamp, entry.name, entry, info))
+            candidates.sort(key=lambda item: (item[0], item[1]), reverse=True)
+            # Keep the immediate pre-save state even after a clock rollback.
+            keep = {protected}
+            for _, _, entry, _ in candidates:
+                if len(keep) >= self.backup_minimum:
+                    break
+                keep.add(entry)
+            remaining = len(candidates)
+            total = sum(item[3].st_size for item in candidates)
+            for _, _, entry, original in reversed(candidates):
+                if remaining <= self.backup_count and total <= self.backup_bytes:
+                    break
+                if entry in keep:
+                    continue
+                # Preserve corrupt or unexpected contents, even with a reserved name.
+                try:
+                    if original.st_size > MAX_WORKSPACE_BYTES:
+                        continue
+                    validate_state(json.loads(entry.read_text(encoding='utf8')))
+                except (ValueError, KeyError, TypeError, UnicodeError):
+                    continue
+                # Recheck confinement and identity immediately before unlinking.
+                if self.backup_directory() != backups or not plain_path(entry):
+                    continue
+                current = entry.stat()
+                if (current.st_dev, current.st_ino, current.st_size, current.st_mtime_ns) != (
+                        original.st_dev, original.st_ino, original.st_size, original.st_mtime_ns):
+                    continue
+                try:
+                    entry.unlink()
+                except OSError:
+                    logging.warning('Could not remove an old automatic Tumbleweed snapshot; save succeeded.')
+                    continue
+                remaining -= 1
+                total -= original.st_size
+        except (OSError, ValueError):
+            logging.warning('Tumbleweed backup cleanup skipped; save succeeded. Check the backup directory.')
+
     def write(self):
         validate_state(self.state)
         serialized = json.dumps(self.state, ensure_ascii=False, indent=2).encode('utf8')
         require(len(serialized) <= MAX_WORKSPACE_BYTES, 'Workspace exceeds the 128 MB limit. This change was not saved. Keep this collection and start a separate workspace for more material.')
+        snapshot = None
         if self.path.exists():
-            backups = self.folder / 'backups'
-            backups.mkdir(exist_ok=True)
-            name = datetime.now().strftime('%Y%m%d-%H%M%S-%f') + '.json'
-            (backups / name).write_bytes(self.path.read_bytes())
+            backups = self.backup_directory()
+            name = 'auto-' + datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S-%f') + '-' + secrets.token_hex(8) + '.json'
+            snapshot = backups / name
+            # Incomplete snapshots never enter the managed recovery namespace.
+            # A single writer owns this folder; refuse a pre-existing final name.
+            if snapshot.exists() or snapshot.is_symlink():
+                raise FileExistsError('Automatic snapshot name already exists.')
+            pending_snapshot = snapshot.with_suffix('.pending')
+            with pending_snapshot.open('xb') as f:
+                f.write(self.path.read_bytes())
+                f.flush()
+                os.fsync(f.fileno())
+            pending_snapshot.rename(snapshot)
         temp = self.folder / 'workspace.pending'
         with temp.open('wb') as f:
             f.write(serialized)
@@ -180,6 +273,7 @@ class Store:
                 if attempt == 4:
                     raise
                 time.sleep(.05 * (attempt + 1))
+        self.prune_backups(snapshot)
 
     def merge(self, g, ns, accepted, initial=False):
         incoming = graph_items(g, ns)
@@ -527,7 +621,14 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--port', type=int, default=4318)
     parser.add_argument('--data-dir', default=str(ROOT / 'data'))
+    parser.add_argument('--backup-count', type=int, default=os.environ.get('TUMBLEWEED_BACKUP_COUNT', '50'), help='Maximum automatic snapshots; 0 disables pruning')
+    parser.add_argument('--backup-mib', type=int, default=os.environ.get('TUMBLEWEED_BACKUP_MIB', '512'), help='Automatic snapshot storage target in MiB')
+    parser.add_argument('--backup-minimum', type=int, default=os.environ.get('TUMBLEWEED_BACKUP_MINIMUM', '5'), help='Recovery points always retained, even above the storage target')
     args = parser.parse_args()
+    try:
+        backup_policy(args.backup_count, args.backup_mib, args.backup_minimum)
+    except ValueError as error:
+        parser.error(str(error))
     # One writer per data folder, even if another process chooses a different port.
     Path(args.data_dir).mkdir(parents=True, exist_ok=True)
     instance_lock = open(Path(args.data_dir) / 'server.lock', 'a+b')
@@ -544,7 +645,7 @@ if __name__ == '__main__':
             fcntl.flock(instance_lock.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
     except OSError:
         raise SystemExit('This data folder is already open in another Tumbleweed server.')
-    store = Store(args.data_dir)
+    store = Store(args.data_dir, backup_count=args.backup_count, backup_mib=args.backup_mib, backup_minimum=args.backup_minimum)
     server = ThreadingHTTPServer(('127.0.0.1', args.port), make_handler(store))
     print(f'Tumbleweed Local: http://127.0.0.1:{server.server_port}', flush=True)
     print(f'Saved workspace: {store.path}', flush=True)
@@ -552,3 +653,5 @@ if __name__ == '__main__':
         server.serve_forever()
     except KeyboardInterrupt:
         server.server_close()
+
+
