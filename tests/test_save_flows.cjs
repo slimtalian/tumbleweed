@@ -3,6 +3,29 @@ const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const vm=require('node:vm');
 const source=fs.readFileSync(require('node:path').join(__dirname,'../public/app.js'),'utf8');
+function projectFixture(storage=new Map(),dataPath='workspace-a'){
+ const ctx={activeProject:null,dataPath,sessionStorage:{getItem:k=>storage.get(k)||null,setItem:(k,v)=>storage.set(k,v),removeItem:k=>storage.delete(k)}};
+ vm.createContext(ctx);vm.runInContext(source.slice(source.indexOf('function selectWorkshopProject('),source.indexOf('function renderWorkshop(')),ctx);
+ return ctx;
+}
+test('project selection survives reload and explicit selection wins',()=>{
+ const storage=new Map(),projects=[{id:'a'},{id:'b'}],first=projectFixture(storage);
+ first.activeProject='b';assert.equal(first.selectWorkshopProject(projects).id,'b');
+ const reloaded=projectFixture(storage);assert.equal(reloaded.selectWorkshopProject(projects).id,'b');
+ reloaded.activeProject='a';assert.equal(reloaded.selectWorkshopProject(projects).id,'a');
+});
+test('missing projects fall back and empty workspaces clear stale selection',()=>{
+ const storage=new Map([['tumbleweed-project:workspace-a','archived']]),ctx=projectFixture(storage);
+ assert.equal(ctx.selectWorkshopProject([{id:'available'}]).id,'available');
+ assert.equal(storage.get('tumbleweed-project:workspace-a'),'available');
+ assert.equal(ctx.selectWorkshopProject([]),undefined);assert.equal(storage.has('tumbleweed-project:workspace-a'),false);
+});
+test('project preference is scoped by workspace and unavailable storage cannot break rendering',()=>{
+ const ctx=projectFixture(new Map([['tumbleweed-project:workspace-b','b']]));
+ assert.equal(ctx.selectWorkshopProject([{id:'a'},{id:'b'}]).id,'a');
+ ctx.activeProject=null;ctx.sessionStorage={getItem(){throw Error('Denied');},setItem(){throw Error('Denied');}};
+ assert.equal(ctx.selectWorkshopProject([{id:'b'}]).id,'b');
+});
 function fixture(){
  let resolve,reject;
  const pending=new Promise((a,b)=>{resolve=a;reject=b;});

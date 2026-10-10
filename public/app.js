@@ -266,8 +266,16 @@ function restoreFilters(){try{const prefs=JSON.parse(sessionStorage.getItem('tum
 
 let activeProject=null;
 const taskDrafts=new Map();
+function selectWorkshopProject(projects){
+ const key='tumbleweed-project:'+dataPath;
+ if(!activeProject)try{activeProject=sessionStorage.getItem(key);}catch{}
+ const project=projects.find(p=>p.id===activeProject)||projects[0];
+ activeProject=project?.id||null;
+ try{if(activeProject)sessionStorage.setItem(key,activeProject);else sessionStorage.removeItem(key);}catch{}
+ return project;
+}
 function renderWorkshop(projects){
- const p=projects.find(p=>p.id===activeProject)||projects[0];activeProject=p?.id||null;
+ const p=selectWorkshopProject(projects);
  $('#title').textContent=p?p.title:'Your projects';
  $('#eyebrow').textContent='PROJECT';
  $('#subtitle').textContent='';
