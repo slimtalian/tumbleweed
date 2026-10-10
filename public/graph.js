@@ -117,18 +117,27 @@ function createTumbleweedGraph(canvas, records, edges, onOpen, options={}) {
  const distance=()=>{const [a,b]=[...pointers.values()];return a&&b?Math.hypot(a.x-b.x,a.y-b.y):0;};
  const gesture=()=>{const [a,b]=[...pointers.values()];return a&&b?{angle:Math.atan2(b.y-a.y,b.x-a.x),x:(a.x+b.x)/2,y:(a.y+b.y)/2}:null;};
  const originalTouchAction=canvas.style.touchAction;canvas.style.touchAction='none';
- canvas.onpointerdown=e=>{
+ function beginPointer(e,branch=null){
   if(e.button!==0)return;
   if(pointers.size>=2){e.preventDefault();return;}
   cancelHold();
   const interrupted=Object.values(velocity).some(v=>v!==0)&&!pointers.size;
   if(!pointers.size){stopMotion();({yaw,pitch,roll,zoom}=shown);}lastMove=performance.now();
   const p=point(e);pointers.set(e.pointerId,p);canvas.setPointerCapture(e.pointerId);
-  drag={...p,start:p,moved:interrupted||pointers.size>1};pinchDistance=distance();pinchCenter=gesture();pinchAngle=pinchCenter?.angle||0;stopMotion();hover=null;
+  drag={...p,start:p,branch,moved:interrupted||pointers.size>1};pinchDistance=distance();pinchCenter=gesture();pinchAngle=pinchCenter?.angle||0;stopMotion();hover=null;
   canvas.style.cursor='grabbing';e.preventDefault();
-  if(e.pointerType==='touch'&&pointers.size===1){const node=hit(p);if(node){holdOrigin=p;holdTimer=setTimeout(()=>{holdTimer=0;if(disposed||pointers.size!==1||!pointers.has(e.pointerId)||!drag)return;held=true;drag.moved=true;hover=node;stopMotion();schedulePaint();},350);}}
+  if(!branch&&e.pointerType==='touch'&&pointers.size===1){const node=hit(p);if(node){holdOrigin=p;holdTimer=setTimeout(()=>{holdTimer=0;if(disposed||pointers.size!==1||!pointers.has(e.pointerId)||!drag)return;held=true;drag.moved=true;hover=node;stopMotion();schedulePaint();},350);}}
   schedulePaint();
  };
+ canvas.onpointerdown=e=>beginPointer(e);
+ // A touch on a label belongs to the same gesture as a touch on the canvas.
+ // Capture subsequent movement on the canvas; a stationary release opens the label.
+ const branchInputs=[...parent.querySelectorAll('[data-thread]')].map(button=>{
+  const touchAction=button.style.touchAction;
+  const down=e=>{if(e.pointerType==='touch')beginPointer(e,button);};
+  button.style.touchAction='none';button.addEventListener('pointerdown',down);
+  return {button,touchAction,down};
+ });
  canvas.onpointermove=e=>{
   const p=point(e);
   if(pointers.has(e.pointerId)){
@@ -145,13 +154,14 @@ function createTumbleweedGraph(canvas, records, edges, onOpen, options={}) {
  };
  function finishPointer(e,cancelled=false){
   if(!pointers.has(e.pointerId))return;
-  const selected=!cancelled&&pointers.size===1&&drag&&!drag.moved?hit(point(e)):null;
+  const tapped=!cancelled&&pointers.size===1&&drag&&!drag.moved;
+  const branch=tapped?drag.branch:null,selected=tapped&&!branch?hit(point(e)):null;
   cancelHold();
   pointers.delete(e.pointerId);pinchDistance=distance();pinchCenter=gesture();pinchAngle=pinchCenter?.angle||0;
   if(cancelled||selected||pointers.size||performance.now()-lastMove>90||reducedMotion?.matches)stopMotion();
   const remaining=pointers.values().next().value;drag=remaining?{...remaining,start:remaining,moved:true}:null;
   canvas.style.cursor=remaining?'grabbing':'grab';
-  if(selected){focus=selected.r.id;onOpen(selected.r.id);}schedulePaint();
+  if(branch)branch.click();else if(selected){focus=selected.r.id;onOpen(selected.r.id);}schedulePaint();
  }
  canvas.onpointerup=e=>finishPointer(e);
  canvas.onpointercancel=e=>finishPointer(e,true);
@@ -162,5 +172,5 @@ function createTumbleweedGraph(canvas, records, edges, onOpen, options={}) {
  canvas.oncontextmenu=e=>{if(held||holdOrigin)e.preventDefault();};
  document.querySelector('#rotate-left').onclick=()=>{stopMotion();yaw-=.25;schedulePaint();};document.querySelector('#rotate-right').onclick=()=>{stopMotion();yaw+=.25;schedulePaint();};document.querySelector('#zoom-in').onclick=()=>{zoom=Math.min(3,zoom+.15);schedulePaint();};document.querySelector('#zoom-out').onclick=()=>{zoom=Math.max(.35,zoom-.15);schedulePaint();};document.querySelector('#graph-reset').onclick=()=>{stopMotion();yaw=.18;pitch=-.12;roll=0;zoom=1;focus='';document.querySelector('#graph-focus').value='';schedulePaint();};
  document.querySelector('#graph-labels').onchange=e=>{labels=e.target.checked;schedulePaint();};document.querySelector('#graph-texture').onchange=e=>{texture=e.target.checked;schedulePaint();};document.querySelector('#graph-focus').onchange=e=>{focus=e.target.value;schedulePaint();};
- return ()=>{disposed=true;cancelHold();stopMotion();document.removeEventListener('visibilitychange',pauseMotion);reducedMotion?.removeEventListener('change',pauseMotion);pointers.clear();canvas.removeEventListener('wheel',wheel);canvas.style.touchAction=originalTouchAction;cancelAnimationFrame(frame);frame=0;drag=null;graphCamera={yaw:shown.yaw,pitch:shown.pitch,roll:shown.roll,zoom:shown.zoom,labels,texture};observer.disconnect();for(const event of ['onpointerdown','onpointermove','onpointerup','onpointercancel','onlostpointercapture','onpointerleave','oncontextmenu'])canvas[event]=null;};
+ return ()=>{disposed=true;cancelHold();stopMotion();document.removeEventListener('visibilitychange',pauseMotion);reducedMotion?.removeEventListener('change',pauseMotion);pointers.clear();for(const {button,touchAction,down} of branchInputs){button.removeEventListener('pointerdown',down);button.style.touchAction=touchAction;}canvas.removeEventListener('wheel',wheel);canvas.style.touchAction=originalTouchAction;cancelAnimationFrame(frame);frame=0;drag=null;graphCamera={yaw:shown.yaw,pitch:shown.pitch,roll:shown.roll,zoom:shown.zoom,labels,texture};observer.disconnect();for(const event of ['onpointerdown','onpointermove','onpointerup','onpointercancel','onlostpointercapture','onpointerleave','oncontextmenu'])canvas[event]=null;};
 }
