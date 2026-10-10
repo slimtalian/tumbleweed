@@ -3,6 +3,15 @@ const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const vm=require('node:vm');
 const source=fs.readFileSync(require('node:path').join(__dirname,'../public/app.js'),'utf8');
+test('backup offers a persistent direct link, supports retries, and releases it only after closing',async()=>{
+ let dialog=null,requests=0,revoked=0;const timers=[],links=[];
+ const ctx={Blob,Date,api:async()=>{requests++;return {format:'tumbleweed-local-1',records:{}};},toast:m=>{throw Error(m)},setTimeout:(fn,ms)=>timers.push({fn,ms}),URL:{createObjectURL:()=> 'blob:backup',revokeObjectURL:()=>revoked++},document:{getElementById:()=>dialog,body:{append:d=>dialog=d},createElement:()=>{const nodes={a:{focus(){this.focused=true}},button:{},'[role="status"]':{}};links.push(nodes.a);return {nodes,setAttribute(){},addEventListener(name,fn){this[name]=fn},showModal(){this.open=true},close(){this.open=false;this.closeEvent()},remove(){dialog=null},set close(fn){this.closeEvent=fn},get close(){return ()=>{this.open=false;this.closeEvent()}}};}},$:(selector,root)=>root.nodes[selector]};
+ vm.createContext(ctx);vm.runInContext(source.slice(source.indexOf('let backupPreparing='),source.indexOf('\nfunction ',source.indexOf('let backupPreparing='))),ctx);
+ await ctx.downloadBackup();assert.equal(requests,1);assert.equal(timers.length,0);assert.equal(revoked,0);assert.equal(links[0].href,'blob:backup');assert.match(links[0].download,/T\d{2}-\d{2}-\d{2}-\d{3}Z\.json$/);
+ await ctx.downloadBackup();assert.equal(requests,1);links[0].onclick();assert.match(dialog.nodes['[role="status"]'].textContent,/requested/);assert.equal(timers.length,0);
+ dialog.nodes.button.onclick();assert.equal(dialog,null);assert.equal(timers[0].ms,60000);assert.equal(revoked,0);timers[0].fn();assert.equal(revoked,1);
+ await ctx.downloadBackup();assert.equal(requests,2);assert.equal(links.length,2);
+});
 test('workspace replacement waits for saves and preserves every unfinished draft type',()=>{
  const messages=[],ctx={saveBusy:false,editorDirty:false,modalDrafts:new Set(),taskDrafts:new Map(),toast:m=>messages.push(m)};
  vm.createContext(ctx);vm.runInContext(source.slice(source.indexOf('function workspaceReplacementReady('),source.indexOf('function rememberFilters(')),ctx);
