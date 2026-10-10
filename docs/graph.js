@@ -53,8 +53,26 @@ function createTumbleweedGraph(canvas, records, edges, onOpen, options={}) {
  let frame=0,disposed=false,lastFrame=0,lastMove=0,velocity={yaw:0,pitch:0,roll:0};
  const reducedMotion=window.matchMedia?.('(prefers-reduced-motion: reduce)');
  function stopMotion(){velocity={yaw:0,pitch:0,roll:0};}
+ function rotateScreen(dx,dy){
+  const angle=Math.hypot(dx,dy);if(!angle)return;
+  // Compose around screen axes, so a twisted or upside-down model cannot
+  // reverse a drag. Positive depth is the visible front of the tumbleweed.
+  const cy=Math.cos(yaw),sy=Math.sin(yaw),cp=Math.cos(pitch),sp=Math.sin(pitch),cr=Math.cos(roll),sr=Math.sin(roll);
+  const m=[cr*cy+sr*sp*sy,-sr*cp,-cr*sy+sr*sp*cy,sr*cy-cr*sp*sy,cr*cp,-sr*sy-cr*sp*cy,cp*sy,sp,cp*cy];
+  const ax=-dy/angle,ay=dx/angle,c=Math.cos(angle),s=Math.sin(angle),k=1-c;
+  for(let col=0;col<3;col++){
+   const x=m[col],y=m[3+col],z=m[6+col],dot=ax*x+ay*y;
+   m[col]=x*c+ay*z*s+ax*dot*k;
+   m[3+col]=y*c-ax*z*s+ay*dot*k;
+   m[6+col]=z*c+(ax*y-ay*x)*s;
+  }
+  pitch=Math.asin(Math.max(-1,Math.min(1,m[7])));
+  if(Math.abs(Math.cos(pitch))>1e-8){yaw=Math.atan2(m[6],m[8]);roll=Math.atan2(-m[1],m[4]);}
+  else roll=Math.atan2(m[3],m[0])+Math.sign(m[7])*yaw;
+  Object.assign(shown,{yaw,pitch,roll});
+ }
  function addRotation(dy,dp,dr){
-  yaw+=dy;pitch+=dp;roll+=dr;
+  rotateScreen(dy,dp);roll+=dr;
   // Direct manipulation stays under the fingers; only released momentum eases.
   Object.assign(shown,{yaw,pitch,roll});
   const now=performance.now(),dt=Math.max(8,Math.min(50,now-lastMove)),blend=1-Math.exp(-dt/35);
@@ -70,7 +88,7 @@ function createTumbleweedGraph(canvas, records, edges, onOpen, options={}) {
   frame=0;if(disposed)return;
   const dt=Math.max(1,Math.min(64,now-lastFrame));lastFrame=now;
   if(reducedMotion?.matches)stopMotion();
-  if(!drag){const decay=Math.exp(-dt/230),travel=230*(1-decay);yaw+=velocity.yaw*travel;pitch+=velocity.pitch*travel;roll+=velocity.roll*travel;for(const key of Object.keys(velocity)){velocity[key]*=decay;if(Math.abs(velocity[key])<.00002)velocity[key]=0;}}
+  if(!drag){const decay=Math.exp(-dt/230),travel=230*(1-decay);rotateScreen(velocity.yaw*travel,velocity.pitch*travel);roll+=velocity.roll*travel;for(const key of Object.keys(velocity)){velocity[key]*=decay;if(Math.abs(velocity[key])<.00002)velocity[key]=0;}}
   const blend=reducedMotion?.matches?1:1-Math.exp(-dt/32);let settling=false;
   for(const [key,target] of Object.entries({yaw,pitch,roll,zoom,panX,panY})){const gap=target-shown[key];if(Math.abs(gap)<.0001)shown[key]=target;else{shown[key]+=gap*blend;settling=true;}}
   paint();if(settling||Object.values(velocity).some(v=>v!==0)&&!drag)frame=requestAnimationFrame(animate);
@@ -193,7 +211,7 @@ function createTumbleweedGraph(canvas, records, edges, onOpen, options={}) {
  const wheel=e=>{e.preventDefault();cancelHold();stopMotion();const delta=e.deltaY*(e.deltaMode===1?16:e.deltaMode===2?height:1);zoom=clampZoom(zoom*Math.exp(-delta*.0015));schedulePaint();};
  canvas.addEventListener('wheel',wheel,{passive:false});
  canvas.oncontextmenu=e=>{if(held||holdOrigin)e.preventDefault();};
- document.querySelector('#rotate-left').onclick=()=>{stopMotion();yaw-=.25;schedulePaint();};document.querySelector('#rotate-right').onclick=()=>{stopMotion();yaw+=.25;schedulePaint();};document.querySelector('#zoom-in').onclick=()=>{zoom=Math.min(3,zoom+.15);schedulePaint();};document.querySelector('#zoom-out').onclick=()=>{zoom=Math.max(.35,zoom-.15);schedulePaint();};document.querySelector('#graph-reset').onclick=()=>{stopMotion();yaw=.18;pitch=-.12;roll=0;zoom=1;panX=0;panY=0;focus='';document.querySelector('#graph-focus').value='';schedulePaint();};
+ document.querySelector('#rotate-left').onclick=()=>{stopMotion();rotateScreen(-.25,0);schedulePaint();};document.querySelector('#rotate-right').onclick=()=>{stopMotion();rotateScreen(.25,0);schedulePaint();};document.querySelector('#zoom-in').onclick=()=>{zoom=Math.min(3,zoom+.15);schedulePaint();};document.querySelector('#zoom-out').onclick=()=>{zoom=Math.max(.35,zoom-.15);schedulePaint();};document.querySelector('#graph-reset').onclick=()=>{stopMotion();yaw=.18;pitch=-.12;roll=0;zoom=1;panX=0;panY=0;focus='';document.querySelector('#graph-focus').value='';schedulePaint();};
  document.querySelector('#graph-labels').onchange=e=>{labels=e.target.checked;schedulePaint();};document.querySelector('#graph-texture').onchange=e=>{texture=e.target.checked;schedulePaint();};document.querySelector('#graph-focus').onchange=e=>{focus=e.target.value;schedulePaint();};
  return ()=>{disposed=true;cancelHold();stopMotion();document.removeEventListener('visibilitychange',pauseMotion);reducedMotion?.removeEventListener('change',pauseMotion);pointers.clear();for(const {button,touchAction,down} of branchInputs){button.removeEventListener('pointerdown',down);button.style.touchAction=touchAction;}canvas.removeEventListener('wheel',wheel);canvas.style.touchAction=originalTouchAction;cancelAnimationFrame(frame);frame=0;drag=null;graphCamera={yaw:shown.yaw,pitch:shown.pitch,roll:shown.roll,zoom:shown.zoom,panX:shown.panX,panY:shown.panY,labels,texture};observer.disconnect();for(const event of ['onpointerdown','onpointermove','onpointerup','onpointercancel','onlostpointercapture','onpointerleave','oncontextmenu'])canvas[event]=null;};
 }
