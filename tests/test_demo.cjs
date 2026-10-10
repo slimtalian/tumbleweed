@@ -12,6 +12,20 @@ const model=vm.runInContext('TumbleweedDemoModel',context);
 const seed=vm.runInContext('TumbleweedDemoSeed',context);
 const change=(state,request)=>model.mutate(state,{revision:state.revision,...request},seed);
 
+test('custom groups overlap, rename, restore, and preserve source evidence',()=>{
+ const a='sample::branch-0-note-0',b='sample::branch-1-note-0';
+ let state=change(seed,{action:'save-group',name:'Trail',ids:[a,b]});
+ state=change(state,{action:'save-group',name:'Second',ids:[a]});
+ state=change(state,{action:'save-group',name:'Reading',old_name:'Trail',ids:[b]});
+ assert.equal(JSON.stringify(state.records[a].annotations.groups),'["Second"]');
+ assert.equal(JSON.stringify(state.records[b].annotations.groups),'["Reading"]');
+ assert.equal(JSON.stringify(state.records[a].raw),JSON.stringify(seed.records[a].raw));
+ assert.equal(JSON.stringify(state.edges),JSON.stringify(seed.edges));assert.equal(JSON.stringify(state.sources),JSON.stringify(seed.sources));
+ const restored=change(seed,{action:'restore',backup:state});assert.deepEqual(restored.records,state.records);
+ for(const request of [{name:'READING',ids:[a]},{name:'Empty',ids:[]},{name:'Other',ids:[a,'missing']},{name:'Other',old_name:'missing',ids:[a]}])assert.throws(()=>change(state,{action:'save-group',...request}));
+ const invalid=structuredClone(state);invalid.records[a].annotations.groups=[123];assert.throws(()=>change(state,{action:'restore',backup:invalid}));
+});
+
 test('the fictional collection is valid, connected, and has six real project examples',()=>{
  model.validate(seed);assert.equal(Object.keys(seed.records).length,48);
  assert.equal(Object.values(seed.records).filter(r=>!r.imported&&r.kind==='project').length,6);

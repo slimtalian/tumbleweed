@@ -20,7 +20,7 @@ const viewInfo = {
 function record(r) {
  if (!r.imported) return Catalog.decorate({...r, coverage:'local_note', source_ids:[], claims:[], dates:r.created_at || ''});
  const raw = r.raw;
- return Catalog.decorate({...raw, ...r.annotations, id:r.id, external_id:r.external_id, namespace:r.namespace, imported:true, raw, annotations:r.annotations, historical:raw.coverage!=='local_markdown', kind:raw.kind, title:r.annotations?.title || raw.title, summary:raw.summary});
+ return Catalog.decorate({...raw, ...r.annotations, id:r.id, external_id:r.external_id, namespace:r.namespace, imported:true, groups:r.annotations?.groups||[], raw, annotations:r.annotations, historical:raw.coverage!=='local_markdown', kind:raw.kind, title:r.annotations?.title || raw.title, summary:raw.summary});
 }
 const records = () => Object.values(state.records).map(record);
 const get = id => state.records[id] && record(state.records[id]);
@@ -264,10 +264,11 @@ function renderReview(){
  bindRecords($('#content'));
 }
 const modalDrafts=new Set();
-for(const id of ['link-dialog','gather-dialog']){
+for(const id of ['link-dialog','gather-dialog','group-dialog']){
  const dialog=$('#'+id);
- dialog.addEventListener('input',()=>modalDrafts.add(id));
- dialog.addEventListener('change',()=>modalDrafts.add(id));
+ const markDirty=e=>{if(id!=='group-dialog'||e.target.name!=='find')modalDrafts.add(id);};
+ dialog.addEventListener('input',markDirty);
+ dialog.addEventListener('change',markDirty);
  dialog.addEventListener('close',()=>modalDrafts.delete(id));
  const discard=async()=>{if(await confirmAction('Discard unsaved edits?','Choose Cancel to keep editing. Saved records and gathered selections are retained.'))dialog.close();};
  dialog.addEventListener('cancel',e=>{if(saveBusy){e.preventDefault();return;}if(modalDrafts.has(id)){e.preventDefault();discard();}});

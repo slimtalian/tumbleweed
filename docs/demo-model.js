@@ -10,6 +10,7 @@ const TumbleweedDemoModel=(()=>{
  const object=value=>value!==null&&typeof value==='object'&&!Array.isArray(value);
  function display(value){
   require(object(value),'Invalid record or annotations.');
+  require(value.groups===undefined||Array.isArray(value.groups)&&value.groups.length<=100&&value.groups.every(g=>typeof g==='string'&&g.trim().length>0&&g.trim().length<=100),'Groups must be up to 100 names of 1–100 characters.');
   for(const field of fields.filter(key=>!['topics','tasks'].includes(key)))require(value[field]===undefined||typeof value[field]==='string',field+' must be text.');
   require(value.topics===undefined||Array.isArray(value.topics)&&value.topics.every(t=>typeof t==='string'),'Topics must be text.');
   require(!value.decision_review_on||/^\d{4}-\d{2}-\d{2}$/.test(value.decision_review_on)&&new Date(value.decision_review_on+'T00:00:00Z').toISOString().slice(0,10)===value.decision_review_on,'Decision review date must be YYYY-MM-DD.');
@@ -58,6 +59,20 @@ const TumbleweedDemoModel=(()=>{
   require(object(request)&&request.revision===previous.revision,'Workspace changed in another window. Reload before saving.');
   let next=copy(previous);
   switch(request.action){
+   case 'save-group':{
+    const old=request.old_name||'',ids=request.ids;
+    require(typeof request.name==='string'&&request.name.trim().length>0&&request.name.trim().length<=100,'Name this group (up to 100 characters).');
+    require(typeof old==='string','Invalid previous group.');const name=request.name.trim();
+    require(Array.isArray(ids)&&ids.length>0&&ids.length<=1000&&ids.every(id=>typeof id==='string'&&next.records[id]),'Choose 1–1,000 existing records.');
+    const displays=Object.values(next.records).map(r=>r.imported?(r.annotations||={}):r),names=new Set(displays.flatMap(r=>r.groups||[]));
+    require(!old||names.has(old),'This group is unavailable. Reload before editing.');
+    require(![...names].some(g=>g.toLowerCase()===name.toLowerCase()&&g!==old),'A group with this name already exists. Open it to edit its members.');
+    for(const r of Object.values(next.records)){
+     const display=r.imported?r.annotations:r,previous=display.groups||[],groups=previous.filter(g=>!old||g!==old);
+     if(ids.includes(r.id))groups.push(name);
+     if(JSON.stringify(groups)!==JSON.stringify(previous)){display.groups=groups;display.updated_at=stamp();}
+    }break;
+   }
    case 'save-record':{
     const r=request.record;require(object(r),'Record must be an object.');
     require(typeof r.title==='string'&&r.title.trim()&&r.title.length<=500,'A title of up to 500 characters is required.');

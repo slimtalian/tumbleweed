@@ -35,6 +35,7 @@ def require(condition, message):
         raise ValueError(message)
 
 def validate_display_fields(r):
+    require(isinstance(r.get('groups', []), list) and len(r.get('groups', [])) <= 100 and all(isinstance(g, str) and 0 < len(g.strip()) <= 100 for g in r.get('groups', [])), 'Groups must be up to 100 names of 1–100 characters.')
     for field in ('title', 'summary', 'collection', 'status', 'kind', 'coverage', 'url', 'next_action', 'stopped_at', 'put_away', 'decision_rationale', 'decision_alternatives', 'decision_review_on'):
         require(field not in r or isinstance(r[field], str), f'{field} must be text.')
     require(isinstance(r.get('topics', []), list) and all(isinstance(t, str) for t in r.get('topics', [])), 'Topics must be strings.')
@@ -346,7 +347,26 @@ class Store:
 
     def apply(self, req):
         action = req.get('action')
-        if action == 'save-record':
+        if action == 'save-group':
+            name, old_name, ids = req.get('name'), req.get('old_name', ''), req.get('ids')
+            require(isinstance(name, str) and 0 < len(name.strip()) <= 100, 'Name this group (up to 100 characters).')
+            require(isinstance(old_name, str), 'Invalid previous group.')
+            name = name.strip()
+            require(isinstance(ids, list) and 1 <= len(ids) <= 1000 and all(isinstance(x, str) and x in self.state['records'] for x in ids), 'Choose 1–1,000 existing records.')
+            displays = [(key, r.setdefault('annotations', {}) if r.get('imported') else r) for key, r in self.state['records'].items()]
+            names = {g for _, r in displays for g in r.get('groups', [])}
+            require(not old_name or old_name in names, 'This group is unavailable. Reload before editing.')
+            require(not any(g.lower() == name.lower() and g != old_name for g in names), 'A group with this name already exists. Open it to edit its members.')
+            chosen = set(ids)
+            for key, r in displays:
+                previous = r.get('groups', [])
+                groups = [g for g in previous if not old_name or g != old_name]
+                if key in chosen:
+                    groups.append(name)
+                if groups != previous:
+                    r['groups'] = groups
+                    r['updated_at'] = now()
+        elif action == 'save-record':
             value = req.get('record', {})
             require(isinstance(value, dict), 'Record must be an object.')
             key = value.get('id') or 'local::' + secrets.token_hex(12)

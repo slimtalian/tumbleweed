@@ -235,3 +235,11 @@ TBA
 
 [MIT](LICENSE). The application source and original bundled SVG artwork use
 the same license. Imported content remains subject to its own rights.
+
+
+
+### Focused tumbleweeds and your groups
+
+Open a collection branch to explore its own tumbleweed, then enter a topic or use the breadcrumb to return. Automatic groups use existing collection and topic labels; no remote AI processes your notes or invents evidence links. Each view remembers its camera during the current session.
+
+Choose **+ Your group**, name it, and select 1–1,000 records across collections. Use **Your groups** to reopen it and **Edit group** to rename it or change membership. A record can belong to multiple groups (up to 100); groups must contain at least one record. Archived members are retained but hidden in the map. Groups are saved with records, including imported-record annotations, and included in workspace backups. Original imported text, sources, and relationships stay intact. Local groups save on disk; demo groups use browser storage.

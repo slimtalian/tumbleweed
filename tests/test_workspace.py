@@ -22,6 +22,36 @@ def fixture():
 
 
 class WorkspaceTests(unittest.TestCase):
+    def test_custom_groups_overlap_rename_restore_and_preserve_evidence(self):
+        self.import_graph()
+        before = copy.deepcopy(self.store.state)
+        self.mutate(action='save-group', name='My trail', ids=['test::a', 'test::b'])
+        self.mutate(action='save-group', name='Another trail', ids=['test::a'])
+        self.mutate(action='save-group', old_name='My trail', name='Reading trail', ids=['test::b'])
+        self.assertEqual(self.store.state['records']['test::a']['annotations']['groups'], ['Another trail'])
+        self.assertEqual(self.store.state['records']['test::b']['annotations']['groups'], ['Reading trail'])
+        self.assertEqual(self.store.state['edges'], before['edges'])
+        self.assertEqual(self.store.state['sources'], before['sources'])
+        self.assertEqual(self.store.state['records']['test::a']['raw'], before['records']['test::a']['raw'])
+        self.assertEqual(Store(self.test_path).state, self.store.state)
+        backup = copy.deepcopy(self.store.state)
+        self.mutate(action='restore', backup=backup)
+        self.assertEqual(self.store.state['records'], backup['records'])
+
+    def test_invalid_group_edits_are_atomic(self):
+        self.import_graph()
+        self.mutate(action='save-group', name='Trail', ids=['test::a'])
+        before = copy.deepcopy(self.store.state)
+        for req in [dict(name='Other', ids=['test::a', 'missing']), dict(name=' ', ids=['test::a']), dict(name='TRAIL', ids=['test::b']), dict(name='Other', old_name='missing', ids=['test::a']), dict(name='Empty', ids=[])]:
+            with self.assertRaises(ValueError):
+                self.mutate(action='save-group', **req)
+            self.assertEqual(self.store.state, before)
+        invalid = copy.deepcopy(before)
+        invalid['records']['test::a']['annotations']['groups'] = [123]
+        with self.assertRaises(ValueError):
+            self.mutate(action='restore', backup=invalid)
+        self.assertEqual(self.store.state, before)
+
     def setUp(self):
         self.test_path = Path(os.environ.get('TUMBLEWEED_TEST_ROOT', ROOT / 'test-results')) / uuid.uuid4().hex
         self.test_path.mkdir(parents=True)
