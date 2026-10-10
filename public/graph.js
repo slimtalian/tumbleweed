@@ -55,6 +55,8 @@ function createTumbleweedGraph(canvas, records, edges, onOpen, options={}) {
  function stopMotion(){velocity={yaw:0,pitch:0,roll:0};}
  function addRotation(dy,dp,dr){
   yaw+=dy;pitch+=dp;roll+=dr;
+  // Direct manipulation stays under the fingers; only released momentum eases.
+  Object.assign(shown,{yaw,pitch,roll});
   const now=performance.now(),dt=Math.max(8,Math.min(50,now-lastMove)),blend=1-Math.exp(-dt/35);
   for(const [key,delta] of Object.entries({yaw:dy,pitch:dp,roll:dr}))velocity[key]+=(Math.max(-.008,Math.min(.008,delta/dt))-velocity[key])*blend;
   lastMove=now;
@@ -117,6 +119,7 @@ function createTumbleweedGraph(canvas, records, edges, onOpen, options={}) {
  const originalTouchAction=canvas.style.touchAction;canvas.style.touchAction='none';
  canvas.onpointerdown=e=>{
   if(e.button!==0)return;
+  if(pointers.size>=2){e.preventDefault();return;}
   cancelHold();
   const interrupted=Object.values(velocity).some(v=>v!==0)&&!pointers.size;
   if(!pointers.size){stopMotion();({yaw,pitch,roll,zoom}=shown);}lastMove=performance.now();
@@ -131,7 +134,7 @@ function createTumbleweedGraph(canvas, records, edges, onOpen, options={}) {
   if(pointers.has(e.pointerId)){
    e.preventDefault();pointers.set(e.pointerId,p);
    if(holdOrigin&&pointers.size===1){if(Math.hypot(p.x-holdOrigin.x,p.y-holdOrigin.y)<=8)return;cancelHold();}
-   if(pointers.size>1){const next=distance();if(pinchDistance>0&&next>0){zoom=clampZoom(zoom*next/pinchDistance);shown.zoom=zoom;}const nextGesture=gesture();const twist=Math.atan2(Math.sin(nextGesture.angle-pinchAngle),Math.cos(nextGesture.angle-pinchAngle));if(pinchCenter)addRotation((nextGesture.x-pinchCenter.x)*.006,(nextGesture.y-pinchCenter.y)*.006,twist);pinchDistance=next;pinchAngle=nextGesture.angle;pinchCenter=nextGesture;drag.moved=true;}
+   if(pointers.size>1){const next=distance(),stable=pinchDistance>=24&&next>=24;if(stable){zoom=clampZoom(zoom*next/pinchDistance);shown.zoom=zoom;}const nextGesture=gesture();const twist=stable?Math.atan2(Math.sin(nextGesture.angle-pinchAngle),Math.cos(nextGesture.angle-pinchAngle)):0;if(pinchCenter)addRotation((nextGesture.x-pinchCenter.x)*.006,(nextGesture.y-pinchCenter.y)*.006,twist);pinchDistance=next;pinchAngle=nextGesture.angle;pinchCenter=nextGesture;drag.moved=true;}
    else if(drag){addRotation((p.x-drag.x)*.006,(p.y-drag.y)*.006,0);drag.moved ||= Math.hypot(p.x-drag.start.x,p.y-drag.start.y)>4;drag.x=p.x;drag.y=p.y;}
    hover=null;
   }else{
