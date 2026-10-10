@@ -3,16 +3,16 @@
 function renderImports(){
  $('#content').innerHTML=`<section class="panel"><div class="margin-label">YOUR OWN COPY OF THE DEMO</div><h2>Try a thought. Make something of it.</h2><p>Everything here starts as fictional sample data. Capture a note, connect an idea, or finish a project step. Your saved changes belong to this browser.</p><div class="detail-actions"><button id="demo-export">Export this workspace</button><button id="demo-reset">Reset sample collection</button></div><p class="muted">Reset starts over with the samples. Export anything you want to keep first. Clearing your browser's site data also clears its saved demo changes.</p><label>Restore a Tumbleweed backup<input id="demo-restore-file" type="file" accept=".json,application/json"></label><button id="demo-restore">Review restore</button><p id="demo-error" role="alert"></p></section><section class="panel demo-help"><h2>Bring your own knowledge home.</h2><p>The downloadable local application starts empty and supports Markdown and graph imports. It saves your workspace and previous versions on your computer.</p><a class="demo-source-link" href="https://github.com/slimtalian/tumbleweed" target="_blank" rel="noopener noreferrer">Get the local application ↗</a></section>`;
  $('#demo-export').onclick=downloadBackup;$('#demo-reset').onclick=resetDemo;
- $('#demo-restore').onclick=async()=>{try{
+ $('#demo-restore').onclick=async()=>{try{if(!workspaceReplacementReady())return;
   const file=$('#demo-restore-file').files[0];if(!file)throw new Error('Choose a backup first.');if(file.size>8*1024*1024)throw new Error('The browser demo supports backups up to 8 MB. Use the local app for larger collections.');
   const backup=TumbleweedDemoModel.validate(JSON.parse(await file.text()));
-  if(await confirmAction('Restore this browser workspace?',`Replace this demo copy with ${Object.keys(backup.records).length} records? Export your current workspace first if you want to keep it.`)){await mutate({action:'restore',backup});toast('Backup restored in this browser.');}
+  if(await confirmAction('Restore this browser workspace?',`Replace this demo copy with ${Object.keys(backup.records).length} records? Export your current workspace first if you want to keep it.`)){if(!workspaceReplacementReady())return;await mutate({action:'restore',backup});toast('Backup restored in this browser.');}
  }catch(error){const box=$('#demo-error');if(box)box.textContent=error.message;else toast(error.message);}};
 }
 async function resetDemo(){
- if(editorDirty||modalDrafts.size||taskDrafts.size){toast('Save or close your unfinished drafts before resetting.');return;}
+ if(!workspaceReplacementReady())return;
  if(await confirmAction('Reset the sample collection?','This replaces your browser copy with the original fictional samples. Export your changes first if you want to keep them.')){
-  try{await mutate({action:'reset-demo'});Specimen.picked.clear();persistGather();clearSpecimenFilters();rememberFilters();activeProject=null;navigate('graph');toast('The sample collection is ready to explore again.');}catch(error){toast(error.message);}
+  try{if(!workspaceReplacementReady())return;await mutate({action:'reset-demo'});Specimen.picked.clear();persistGather();clearSpecimenFilters();rememberFilters();activeProject=null;navigate('graph');toast('The sample collection is ready to explore again.');}catch(error){toast(error.message);}
  }
 }
 function renderGuide(){

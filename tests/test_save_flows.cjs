@@ -3,6 +3,15 @@ const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const vm=require('node:vm');
 const source=fs.readFileSync(require('node:path').join(__dirname,'../public/app.js'),'utf8');
+test('workspace replacement waits for saves and preserves every unfinished draft type',()=>{
+ const messages=[],ctx={saveBusy:false,editorDirty:false,modalDrafts:new Set(),taskDrafts:new Map(),toast:m=>messages.push(m)};
+ vm.createContext(ctx);vm.runInContext(source.slice(source.indexOf('function workspaceReplacementReady('),source.indexOf('function rememberFilters(')),ctx);
+ assert.equal(ctx.workspaceReplacementReady(),true);
+ for(const field of ['saveBusy','editorDirty']){ctx[field]=true;assert.equal(ctx.workspaceReplacementReady(),false);ctx[field]=false;}
+ ctx.modalDrafts.add('link-dialog');assert.equal(ctx.workspaceReplacementReady(),false);ctx.modalDrafts.clear();
+ ctx.taskDrafts.set('project','Unfinished step');assert.equal(ctx.workspaceReplacementReady(),false);assert.equal(ctx.taskDrafts.get('project'),'Unfinished step');
+ ctx.taskDrafts.clear();assert.equal(ctx.workspaceReplacementReady(),true);assert.equal(messages.length,4);
+});
 function projectFixture(storage=new Map(),dataPath='workspace-a'){
  const ctx={activeProject:null,dataPath,sessionStorage:{getItem:k=>storage.get(k)||null,setItem:(k,v)=>storage.set(k,v),removeItem:k=>storage.delete(k)}};
  vm.createContext(ctx);vm.runInContext(source.slice(source.indexOf('function selectWorkshopProject('),source.indexOf('function renderWorkshop(')),ctx);
@@ -38,6 +47,18 @@ function fixture(){
  vm.runInContext(source.slice(begin,end),ctx);
  return {ctx,input,button,form,error,drafts,messages,resolve,reject,submit:()=>form.onsubmit({preventDefault(){},currentTarget:form})};
 }
+test('local and demo restore recheck unfinished work after asynchronous file reading',async()=>{
+ const demoPath=require('node:path').join(__dirname,'../demo/ui.js');
+ const handlers=[[source,'#restore']];if(fs.existsSync(demoPath))handlers.push([fs.readFileSync(demoPath,'utf8'),'#demo-restore']);
+ for(const [text,selector] of handlers){
+  let ready=true,readFile,mutations=0;
+  const pending=new Promise(resolve=>readFile=resolve),button={},file={size:10,text:()=>pending};
+  const ctx={$:id=>id===selector?button:{files:[file]},workspaceReplacementReady:()=>ready,confirmAction:async()=>true,mutate:async()=>mutations++,toast(){},showImportError(e){throw Error(e)},TumbleweedDemoModel:{validate:x=>x}};
+  vm.createContext(ctx);const start=text.indexOf(" $('"+selector+"').onclick="),end=selector==='#restore'?text.indexOf('\n',start):text.indexOf('\n}',start);
+  vm.runInContext(text.slice(start,end),ctx);
+  const restoring=button.onclick();ready=false;readFile('{"format":"tumbleweed-local-1","records":{}}');await restoring;assert.equal(mutations,0,selector+' must retain drafts created during file read');
+ }
+});
 test('navigation during a rejected task save keeps draft and reports error without missing DOM access',async()=>{
  const f=fixture(),save=f.submit();assert.equal(f.drafts.get('project'),'Keep this step');
  f.form.isConnected=false;f.error.isConnected=false;f.ctx.view='graph';f.ctx.$=()=>null;
