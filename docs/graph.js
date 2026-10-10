@@ -58,7 +58,11 @@ function createTumbleweedGraph(canvas, records, edges, onOpen, options={}) {
   // Direct manipulation stays under the fingers; only released momentum eases.
   Object.assign(shown,{yaw,pitch,roll});
   const now=performance.now(),dt=Math.max(8,Math.min(50,now-lastMove)),blend=1-Math.exp(-dt/35);
-  for(const [key,delta] of Object.entries({yaw:dy,pitch:dp,roll:dr}))velocity[key]+=(Math.max(-.008,Math.min(.008,delta/dt))-velocity[key])*blend;
+  for(const [key,delta] of Object.entries({yaw:dy,pitch:dp,roll:dr})){
+   // A direction change must not release with momentum from the previous stroke.
+   if(delta*velocity[key]<0)velocity[key]=0;
+   velocity[key]+=(Math.max(-.008,Math.min(.008,delta/dt))-velocity[key])*blend;
+  }
   lastMove=now;
  }
  function schedulePaint(){if(!disposed&&!frame){lastFrame=performance.now();frame=requestAnimationFrame(animate);}}
