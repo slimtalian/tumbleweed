@@ -71,7 +71,13 @@ function createTumbleweedGraph(canvas, records, edges, onOpen, options={}) {
   for(const [key,target] of Object.entries({yaw,pitch,roll,zoom})){const gap=target-shown[key];if(Math.abs(gap)<.0001)shown[key]=target;else{shown[key]+=gap*blend;settling=true;}}
   paint();if(settling||Object.values(velocity).some(v=>v!==0)&&!drag)frame=requestAnimationFrame(animate);
  }
- const pauseMotion=()=>{cancelHold();stopMotion();Object.assign(shown,{yaw,pitch,roll,zoom});};
+ const pauseMotion=()=>{
+  cancelHold();stopMotion();({yaw,pitch,roll,zoom}=shown);
+  const captured=[...pointers.keys()];pointers.clear();drag=null;
+  pinchDistance=0;pinchCenter=null;pinchAngle=0;hover=null;canvas.style.cursor='grab';
+  for(const id of captured)if(canvas.hasPointerCapture?.(id))canvas.releasePointerCapture(id);
+  schedulePaint();
+ };
  document.addEventListener('visibilitychange',pauseMotion);
  reducedMotion?.addEventListener('change',pauseMotion);
  function paint(){
@@ -83,12 +89,12 @@ function createTumbleweedGraph(canvas, records, edges, onOpen, options={}) {
   shadow.addColorStop(0,'rgba(0,0,0,.25)');shadow.addColorStop(1,'rgba(0,0,0,0)');ctx.fillStyle=shadow;ctx.fillRect(0,height*.81,width,height*.18);
   if(texture&&nodes.length){for(const fiber of fibers){const ps=fiber.path.map(project),depth=ps.reduce((n,p)=>n+p.z,0)/ps.length;ctx.beginPath();ctx.moveTo(ps[0].x,ps[0].y);for(let i=1;i<ps.length-1;i++){const p=ps[i],next=ps[i+1];ctx.quadraticCurveTo(p.x,p.y,(p.x+next.x)/2,(p.y+next.y)/2);}ctx.lineTo(ps.at(-1).x,ps.at(-1).y);ctx.lineWidth=fiber.weight;ctx.strokeStyle=`rgba(193,157,101,${fiber.alpha*(.82+(depth+1)*.28)*(active?.62:1)})`;ctx.stroke();}}
   if(options.specimen){
-   const handles=[...parent.querySelectorAll('[data-thread]')];
-   handles.forEach(b=>{
+   // Measure all labels before writing positions, avoiding a layout flush per label.
+   const handles=[...parent.querySelectorAll('[data-thread]')].map(b=>({b,labelWidth:b.offsetWidth,labelHeight:b.offsetHeight||44}));
+   handles.forEach(({b,labelWidth,labelHeight})=>{
     const origin=centers.get(b.dataset.thread);if(!origin)return;
     const center=project(origin),anchor=project(mul(origin,1.65)),side=anchor.x<width/2?-1:1;
     b.classList.toggle('west',side<0);
-    const labelWidth=b.offsetWidth,labelHeight=b.offsetHeight||44;
     const x=Math.max(side<0?labelWidth+4:4,Math.min(width-(side>0?labelWidth+4:4),anchor.x));
     const y=Math.max(labelHeight/2+8,Math.min(height-72-labelHeight/2,anchor.y));
     b.style.left=x+'px';b.style.top=y+'px';b.style.opacity=String(Math.max(.65,Math.min(1,.82+center.z*.2)));b.style.zIndex=String(Math.round(100+center.z*20));
