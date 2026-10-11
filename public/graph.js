@@ -106,16 +106,6 @@ function createTumbleweedGraph(canvas, records, edges, onOpen, options={}) {
   ctx.clearRect(0,0,width,height);
   const active=hover?.r.id||focus;
   const related=new Set([active]);if(active)for(const e of edges){if(e.from===active)related.add(e.to);if(e.to===active)related.add(e.from);}
-  // The parent is a decorative, stationary silhouette, never an extra set of
-  // records or evidence edges. Its orientation stays fixed while the child turns.
-  if(texture&&options.parentCamera){
-   const parentView={...options.parentCamera,zoom:1.34,panX:0,panY:0};
-   ctx.strokeStyle='rgba(167,157,121,.12)';ctx.lineWidth=.65;
-   for(let i=0;i<fibers.length;i+=5){
-    const ps=fibers[i].path.map(p=>project(p,parentView));ctx.beginPath();ctx.moveTo(ps[0].x,ps[0].y);
-    for(let j=1;j<ps.length;j++)ctx.lineTo(ps[j].x,ps[j].y);ctx.stroke();
-   }
-  }
   // Grounding shadow under the twig silhouette, no network or image asset.
   const shadow=ctx.createRadialGradient(width/2,height*.89,1,width/2,height*.89,width*.27);
   shadow.addColorStop(0,'rgba(0,0,0,.25)');shadow.addColorStop(1,'rgba(0,0,0,0)');ctx.fillStyle=shadow;ctx.fillRect(0,height*.81,width,height*.18);
@@ -128,22 +118,12 @@ function createTumbleweedGraph(canvas, records, edges, onOpen, options={}) {
     const center=project(origin),anchor=project(mul(origin,1.65)),side=anchor.x<width/2?-1:1;
     b.classList.toggle('west',side<0);
     const x=Math.max(side<0?labelWidth+4:4,Math.min(width-(side>0?labelWidth+4:4),anchor.x));
-    const y=Math.max(labelHeight/2+((options.outside||[]).length?80:8),Math.min(height-72-labelHeight/2,anchor.y));
+    const y=Math.max(labelHeight/2+8,Math.min(height-72-labelHeight/2,anchor.y));
     b.style.left=x+'px';b.style.top=y+'px';b.style.opacity=String(Math.max(.65,Math.min(1,.82+center.z*.2)));b.style.zIndex=String(Math.round(100+center.z*20));
     ctx.beginPath();ctx.moveTo(center.x,center.y);ctx.quadraticCurveTo((center.x+x)/2,(center.y+y)/2-8,x,y);ctx.lineWidth=options.collection===b.dataset.thread?1.5:.7;ctx.strokeStyle=options.collection===b.dataset.thread?'#c6ad72':'rgba(162,140,98,.25)';ctx.stroke();
    });
   }
   positions=points.map(p=>({...project(p),r:p.r,size:p.r.kind==='project'?5.8:2.5+Math.min(3,(degree.get(p.r.id)||0)*.28)}));
-  // At most three existing cross-scope links; their inner endpoints follow rotation.
-  const outsideHandles=[...parent.querySelectorAll('[data-outside]')];
-  for(const button of outsideHandles){
-   const i=Number(button.dataset.outside),group=options.outside?.[i];if(!group)continue;
-   const link=group.links.find(e=>e.inside===active)||group.links[0],a=positions[indices.get(link.inside)];if(!a)continue;
-   const x=width*(i+.5)/options.outside.length,y=58;
-   button.style.left=x+'px';button.style.top='8px';
-   ctx.beginPath();ctx.strokeStyle=active===link.inside?'rgba(230,182,108,.95)':'rgba(199,169,119,.5)';ctx.lineWidth=1;
-   ctx.setLineDash(link.basis==='inferred'?[4,4]:[]);curve(a,{x,y},link.id);ctx.stroke();ctx.setLineDash([]);
-  }
   for(const e of edges){const a=positions[indices.get(e.from)],b=positions[indices.get(e.to)];if(!a||!b)continue;const hot=active&&(e.from===active||e.to===active);ctx.beginPath();ctx.strokeStyle=hot?'rgba(230,182,108,.95)':active?'rgba(164,145,111,.065)':'rgba(199,169,119,.36)';ctx.lineWidth=hot?1.7:.85;ctx.setLineDash(e.basis==='inferred'?[4,4]:[]);curve(a,b,e.id);ctx.stroke();}ctx.setLineDash([]);
   for(const p of [...positions].sort((a,b)=>a.z-b.z)){const hit=active===p.r.id,dim=options.matches&&!options.matches.has(p.r.id);ctx.globalAlpha=dim?.13:active&&!related.has(p.r.id)?.2:.7+(p.z+1)*.15;ctx.fillStyle=nodeColor(p.r);if(hit){ctx.beginPath();ctx.arc(p.x,p.y,p.size+6,0,Math.PI*2);ctx.strokeStyle='#e8bd78';ctx.lineWidth=1.3;ctx.stroke();ctx.shadowBlur=13;ctx.shadowColor='#dfb570';}ctx.beginPath();ctx.arc(p.x,p.y,p.size,0,Math.PI*2);ctx.fill();ctx.shadowBlur=0;}
   ctx.globalAlpha=1;
@@ -180,7 +160,7 @@ function createTumbleweedGraph(canvas, records, edges, onOpen, options={}) {
  canvas.onpointerdown=e=>beginPointer(e);
  // A touch on a label belongs to the same gesture as a touch on the canvas.
  // Capture subsequent movement on the canvas; a stationary release opens the label.
- const branchInputs=[...parent.querySelectorAll('[data-thread], [data-outside]')].map(button=>{
+ const branchInputs=[...parent.querySelectorAll('[data-thread]')].map(button=>{
   const touchAction=button.style.touchAction;
   const down=e=>{if(e.pointerType==='touch')beginPointer(e,button);};
   button.style.touchAction='none';button.addEventListener('pointerdown',down);

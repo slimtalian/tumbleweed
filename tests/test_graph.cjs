@@ -1,14 +1,13 @@
 const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict'),path=require('node:path');
 const code=fs.readFileSync(path.join(__dirname,'../public/graph.js'),'utf8');
-function setup(reduced=false,specimen=false,initialCamera=null,parentCamera=null,outside=[]){
+function setup(reduced=false,specimen=false,initialCamera=null){
  let draws=0,serial=0,resize,opened=0,cleanup,clock=0,nodePoint;const frames=new Map(),controls=new Map(),listeners=new Map(),timers=new Map(),documentListeners=new Map();let timerId=0,strokes=[],ghostPaths=[],currentPath=[];const handles=['a','b'].map(collection=>({dataset:{thread:collection},offsetWidth:100,offsetHeight:44,classList:{toggle(){}},style:{},clicks:0,click(){this.clicks++},addEventListener(type,fn){this[type]=fn},removeEventListener(type){delete this[type]}}));function advance(ms){clock+=ms;for(const [id,t] of [...timers])if(t.at<=clock){timers.delete(id);t.fn()}}
- const outsideHandles=outside.map((g,i)=>({dataset:{outside:String(i)},style:{},clicks:0,click(){this.clicks++},addEventListener(type,fn){this[type]=fn},removeEventListener(type){delete this[type]}}));
  const context=new Proxy({arc(x,y){nodePoint={x,y}},moveTo(x,y){assert.ok(Number.isFinite(x)&&Number.isFinite(y),'fiber coordinates must stay finite');currentPath=[[x,y]]},lineTo(x,y){currentPath.push([x,y])},stroke(){strokes.push(context.strokeStyle);if(context.strokeStyle==='rgba(167,157,121,.12)')ghostPaths.push(currentPath)},clearRect(){draws++;strokes=[];ghostPaths=[]},measureText(){return {width:30}},createRadialGradient(){return {addColorStop(){}}}}, {get:(o,k)=>o[k]||(()=>{})});
- const canvas={getContext:()=>context,parentElement:{clientWidth:600,clientHeight:500,querySelectorAll:selector=>selector==='[data-outside]'?outsideHandles:selector.includes(',')?[...handles,...outsideHandles]:handles},style:{},addEventListener(type,fn,options){listeners.set(type,{fn,options})},removeEventListener(type){listeners.delete(type)},getBoundingClientRect:()=>({left:0,top:0}),setPointerCapture(){}};
+ const canvas={getContext:()=>context,parentElement:{clientWidth:600,clientHeight:500,querySelectorAll:()=>handles},style:{},addEventListener(type,fn,options){listeners.set(type,{fn,options})},removeEventListener(type){listeners.delete(type)},getBoundingClientRect:()=>({left:0,top:0}),setPointerCapture(){}};
  const sandbox={setTimeout(fn,ms){timers.set(++timerId,{fn,at:clock+ms});return timerId},clearTimeout(id){timers.delete(id)},performance:{now:()=>clock},window:{devicePixelRatio:3,innerWidth:600,matchMedia:()=>({matches:reduced,addEventListener(){},removeEventListener(){}})},document:{addEventListener(type,fn){documentListeners.set(type,fn)},removeEventListener(type){documentListeners.delete(type)},querySelector(id){if(!controls.has(id))controls.set(id,{});return controls.get(id)}},ResizeObserver:class{constructor(fn){resize=fn}observe(){resize()}disconnect(){}},requestAnimationFrame(fn){frames.set(++serial,fn);return serial},cancelAnimationFrame(id){frames.delete(id)}};
  vm.createContext(sandbox);vm.runInContext(code,sandbox);if(initialCamera){sandbox.initialCamera=initialCamera;vm.runInContext("graphCamera=initialCamera",sandbox);}
- cleanup=sandbox.createTumbleweedGraph(canvas,[{id:'one',title:'One',kind:'note',collection:'a',topics:[]},{id:'two',title:'Two',kind:'note',collection:'b',topics:[]}],[{id:'edge',from:'one',to:'two',basis:'explicit'}],()=>{opened++;cleanup()},{specimen,parentCamera,outside,groups:['a','b']});
- return {outsideHandles,canvas,controls,frames,listeners,documentListeners,cleanup,handles,timers,get highlighted(){return strokes.includes('rgba(230,182,108,.95)')},get ghostPaths(){return ghostPaths},get nodePoint(){return nodePoint},get camera(){return vm.runInContext('graphCamera',sandbox)},resize:()=>resize(),advance,settle(){for(let n=0;frames.size&&n<500;n++)this.flush();assert.equal(frames.size,0)},flush(ms=16){advance(ms);const pending=[...frames.values()];frames.clear();pending.forEach(fn=>fn(clock))},get draws(){return draws},get opened(){return opened}};
+ cleanup=sandbox.createTumbleweedGraph(canvas,[{id:'one',title:'One',kind:'note',collection:'a',topics:[]},{id:'two',title:'Two',kind:'note',collection:'b',topics:[]}],[{id:'edge',from:'one',to:'two',basis:'explicit'}],()=>{opened++;cleanup()},{specimen,groups:['a','b']});
+ return {canvas,controls,frames,listeners,documentListeners,cleanup,handles,timers,get highlighted(){return strokes.includes('rgba(230,182,108,.95)')},get ghostPaths(){return ghostPaths},get nodePoint(){return nodePoint},get camera(){return vm.runInContext('graphCamera',sandbox)},resize:()=>resize(),advance,settle(){for(let n=0;frames.size&&n<500;n++)this.flush();assert.equal(frames.size,0)},flush(ms=16){advance(ms);const pending=[...frames.values()];frames.clear();pending.forEach(fn=>fn(clock))},get draws(){return draws},get opened(){return opened}};
 }
 let g=setup();assert.equal(g.frames.size,1);g.resize();g.resize();assert.equal(g.frames.size,1);g.flush();assert.equal(g.draws,1);assert.equal(g.canvas.width,1200);console.log('PASS resize is coalesced and density capped');
 for(let i=0;i<20;i++)g.controls.get('#rotate-left').onclick();assert.equal(g.frames.size,1);g.flush();assert.equal(g.draws,2);console.log('PASS repeated controls draw once per frame');g.settle();
@@ -73,16 +72,3 @@ for(const type of ['touch','mouse'])for(const pitch of [-Math.PI/2,-2,-.12,Math.
  }
 }
 console.log('PASS touch and mouse follow screen directions after twists, upside-down turns, and pole crossings');
-
-for(const reduced of [false,true]){
- const t=setup(reduced,true,null,{yaw:.7,pitch:.3,roll:-.2});t.flush();const parent=JSON.stringify(t.ghostPaths),node={...t.nodePoint};assert.ok(t.ghostPaths.length>0);
- t.canvas.onpointerdown(event(1,0,0));t.canvas.onpointermove(event(1,80,40));t.flush();assert.equal(JSON.stringify(t.ghostPaths),parent);assert.notDeepEqual(t.nodePoint,node);
- t.controls.get('#graph-texture').onchange({target:{checked:false}});t.flush();assert.equal(t.ghostPaths.length,0);t.cleanup();assert.equal(t.frames.size,0);
-}
-console.log('PASS parent outline stays still while child rotates, respects texture toggle, and cleans up');
-
-g=setup(false,true,null,null,[{name:'Elsewhere',links:[{inside:'one',outside:'other',basis:'explicit',id:'outside'}]}]);g.flush();
-const outward=g.outsideHandles[0];assert.equal(outward.style.left,'300px');assert.equal(outward.style.touchAction,'none');
-outward.pointerdown(event(1,300,20));g.canvas.onpointermove(event(1,340,20));g.canvas.onpointerup(event(1,340,20));assert.equal(outward.clicks,0);g.settle();
-outward.pointerdown(event(2,300,20));g.canvas.onpointerup(event(2,300,20));assert.equal(outward.clicks,1);g.cleanup();assert.equal(outward.pointerdown,undefined);
-console.log('PASS outward labels draw safely, share touch rotation, open only on tap and clean up');

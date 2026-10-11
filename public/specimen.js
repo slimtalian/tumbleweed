@@ -25,20 +25,6 @@ function closeThread(){
  $('#detail').close();Specimen.group='';Specimen.allOpen=false;Specimen.recordPage=1;clearSpecimenFilters();
  rememberFilters();render();$('#specimen-all')?.focus({preventScroll:true});if(matchMedia('(max-width:760px)').matches)window.scrollTo({top:0,behavior:'instant'});
 }
-// Cross-scope paths only summarize existing edges, never similarity or membership.
-function outsideWeedGroups(nodes,all,edges){
- const inside=new Set(nodes.slice(0,1500).map(r=>r.id)),scope=new Set(nodes.map(r=>r.id)),available=new Map(all.filter(r=>!r.archived).map(r=>[r.id,r])),groups=new Map(),seen=new Set();
- for(const e of edges){
-  const a=inside.has(e.from),b=inside.has(e.to);if(a===b)continue;
-  const from=a?e.from:e.to,to=a?e.to:e.from,other=available.get(to);if(!other||scope.has(to))continue;
-  const key=JSON.stringify([from,to,e.basis]);if(seen.has(key))continue;seen.add(key);
-  const name=other.collection||'Unsorted';if(!groups.has(name))groups.set(name,{name,links:[]});
-  groups.get(name).links.push({inside:from,outside:to,basis:e.basis,id:e.id});
- }
- const result=[...groups.values()];
- for(const g of result)g.links.sort((a,b)=>(a.basis==='inferred')-(b.basis==='inferred')||a.inside.localeCompare(b.inside)||a.outside.localeCompare(b.outside));
- return result.sort((a,b)=>b.links.length-a.links.length||a.name.localeCompare(b.name)).slice(0,3);
-}
 function renderSpecimen(all,list,projects){
  for(const id of Specimen.picked)if(!get(id)||get(id).archived)Specimen.picked.delete(id);
  persistGather();
@@ -61,22 +47,18 @@ function renderSpecimen(all,list,projects){
  const mapNodes=scoped?nodes.map(r=>({...r,collection:(r.topics||[]).find(t=>groups.includes(t))||''})):nodes;
  const cameraKey=JSON.stringify([collection,topic,Specimen.group]);
  const scopeChanged=Specimen.cameraKey!==null&&Specimen.cameraKey!==cameraKey;
- const parentKey=JSON.stringify(topic&&(collection||Specimen.group)?[collection,'',Specimen.group]:['','','']);
  const parentName=topic?(Specimen.group||collection||'All knowledge'):'All knowledge';
  if(Specimen.cameraKey!==cameraKey){if(Specimen.cameraKey!==null)Specimen.cameras.set(Specimen.cameraKey,graphCamera);graphCamera=Specimen.cameras.get(cameraKey)||null;Specimen.cameraKey=cameraKey;}
- const parentCamera=scoped?(Specimen.cameras.get(parentKey)||{yaw:.18,pitch:-.12,roll:0}):null;
  const hasFilters=['search','collection','topic','coverage','from-date','to-date'].some(id=>$('#'+id).value)||$('#archived').checked;
  const unfolded=hasFilters||Specimen.allOpen||scoped;
  const edges=Object.values(state.edges),name=topic?Catalog.topicLabel(topic):Specimen.group||collection||($('#search').value?'Search results':'All knowledge');
- const outside=scoped?outsideWeedGroups(nodes,allNodes,edges):[];
  const size=16,total=Math.max(1,Math.ceil(list.length/size));Specimen.recordPage=Math.min(total,Specimen.recordPage);
  const visible=list.slice((Specimen.recordPage-1)*size,Specimen.recordPage*size);
  $('#content').innerHTML=`<nav class="weed-path" tabindex="-1" aria-label="Tumbleweed location"><button id="weed-home" ${!scoped?'aria-current="page"':''}>All knowledge</button>${collection?`<span>›</span><button id="weed-parent">${esc(collection)}</button>`:''}${Specimen.group?`<span>›</span><button id="weed-group-parent">${esc(Specimen.group)}</button>`:''}${topic?`<span>›</span><span aria-current="page">${esc(Catalog.topicLabel(topic))}</span>`:''}<button id="new-weed-group">+ Your group</button>${Specimen.group?'<button id="edit-weed-group">Edit group</button>':''}</nav>
  <div class="weed-groups">${customNames.length?`<details><summary>Your groups · ${customNames.length}</summary><div>${customNames.map(c=>`<button data-custom-group="${esc(c)}">${esc(c)} <small>${allNodes.filter(r=>(r.groups||[]).includes(c)).length}</small></button>`).join('')}</div></details>`:''}<details><summary>From topics · ${topics.length}</summary><div>${topics.map(t=>`<button data-auto-topic="${esc(t)}">${esc(Catalog.topicLabel(t))}</button>`).join('')||'<span>Add topics to your records to find automatic groupings.</span>'}</div></details></div>
- ${scoped?`<div class="weed-location-note"><button id="weed-back">← ${esc(parentName)}</button><span role="status">${topic?`Topic: ${esc(Catalog.topicLabel(topic))}`:Specimen.group?'Chosen by you':'Grouped by collection'} · ${nodes.length} ${nodes.length===1?'record':'records'}</span></div>`:''}
- <section class="specimen-table ${outside.length?'has-outside':''} ${unfolded?'unfolded':''}" aria-label="Tumbleweed specimen table">
+ <section class="specimen-table ${unfolded?'unfolded':''}" aria-label="Tumbleweed specimen table">
   <div class="specimen-mark"><span>${scoped?'WITHIN '+esc(name):'YOUR COLLECTION'}</span><small>${nodes.length} ${nodes.length===1?'record':'records'} · ${groups.length} ${groups.length===1?'branch':'branches'}</small></div>
-  <div class="specimen-map ${scopeChanged?'weed-arriving':''}"><div class="graph-stage"><canvas id="graph" aria-label="${scoped?'Focused tumbleweed: '+esc(name)+'. The faint outer outline shows its parent.':'Tumbleweed. Use the branch buttons to enter a collection.'}"></canvas><div class="outside-branches" aria-label="Connections outside this group">${outside.map((g,i)=>`<button data-outside="${i}" title="Open ${esc(g.name)}: ${g.links.length} connections outside this group"><span>↗ ${esc(g.name)}</span><small>${g.links.length} ${g.links.length===1?'link':'links'}</small></button>`).join('')}</div><div class="branch-handles">${groups.map((c,i)=>`<button class="branch-handle ${$('#collection').value===c?'chosen':''}" data-thread="${esc(c)}" aria-label="Open ${esc(c)} branch" aria-pressed="${$('#collection').value===c}"><span class="branch-pin"></span><span>${esc(scoped?Catalog.topicLabel(c):c)}<small>${nodes.filter(r=>scoped?(r.topics||[]).includes(c):r.collection===c).length}</small></span></button>`).join('')}</div><div class="specimen-caption">${matchMedia('(max-width:760px)').matches?'Tap a branch. Follow a thought.':'Pull a branch. Follow a thought.'}</div></div>
+  <div class="specimen-map ${scopeChanged?'weed-arriving':''}"><div class="graph-stage"><canvas id="graph" aria-label="${scoped?'Focused tumbleweed: '+esc(name):'Tumbleweed. Use the branch buttons to enter a collection.'}"></canvas><div class="branch-handles">${groups.map((c,i)=>`<button class="branch-handle ${$('#collection').value===c?'chosen':''}" data-thread="${esc(c)}" aria-label="Open ${esc(c)} branch" aria-pressed="${$('#collection').value===c}"><span class="branch-pin"></span><span>${esc(scoped?Catalog.topicLabel(c):c)}<small>${nodes.filter(r=>scoped?(r.topics||[]).includes(c):r.collection===c).length}</small></span></button>`).join('')}</div><div class="specimen-caption">${matchMedia('(max-width:760px)').matches?'Tap a branch. Follow a thought.':'Pull a branch. Follow a thought.'}</div></div>
   <div class="specimen-controls"><button id="specimen-all">Browse all</button><details class="map-tools"><summary>Map controls</summary><div class="map-tool-body"><div class="graph-controls"><button id="rotate-left" aria-label="Rotate left">↶</button><button id="rotate-right" aria-label="Rotate right">↷</button><button id="zoom-in" aria-label="Zoom in">+</button><button id="zoom-out" aria-label="Zoom out">−</button><button id="graph-reset">Reset</button></div><select id="graph-focus" aria-label="Focus a record"><option value="">Focus a record…</option>${nodes.slice(0,1500).map(r=>`<option value="${esc(r.id)}">${esc(r.title)}</option>`).join('')}</select><label><input id="graph-labels" type="checkbox"> Names</label><label><input id="graph-texture" type="checkbox" checked> Twigs</label>${nodes.length>1500?'<p>The map shows 1,500 records. Browse all or search to reach every record.</p>':''}<p>Drag to turn; release to coast. Two fingers move the map, pinch to zoom, or twist to spin. Reset recentres it. Scroll over the map to zoom. Touch again to stop. Hold a node to highlight its connections. Scroll outside the map to move the page.</p><p>Twigs and branch stems group records. Bright paths are recorded connections; dashed paths are inferred.</p></div></details></div></div>
   ${unfolded?`<aside class="unfolded-thread" aria-label="Unfolded thread"><div class="thread-binding"></div><div class="thread-heading"><div><small>${list.length} ${list.length===1?'record':'records'}</small><h2 id="thread-heading" tabindex="-1">${esc(name)}</h2></div><button id="fold-thread" aria-label="Fold this thread">×</button></div><div class="specimen-records">${visible.map((r,i)=>`<article class="specimen-slip"><span class="slip-index">${String((Specimen.recordPage-1)*size+i+1).padStart(2,'0')}</span><button class="slip-read" data-open="${esc(r.id)}"><small>${esc(r.evidence_label)}</small><h3>${esc(r.title)}</h3><p>${esc(short(r.summary,135))}</p></button><button class="pick-record" data-pick="${esc(r.id)}" aria-pressed="false">+ Gather</button></article>`).join('')||'<p class="muted">No matching records.</p>'}</div>${total>1?`<div class="thread-pages"><button id="thread-prev" ${Specimen.recordPage===1?'disabled':''}>←</button><span>${Specimen.recordPage} / ${total}</span><button id="thread-next" ${Specimen.recordPage===total?'disabled':''}>→</button></div>`:''}</aside>`:''}
   <div class="project-bookmarks" aria-label="Project bookmarks">${projects.slice(-3).reverse().map(p=>`<button class="project-bookmark" data-open="${esc(p.id)}"><span>◈</span><div>${esc(p.title)}<small>${esc(p.next_action||'Choose a next step')}</small></div></button>`).join('')}</div>
@@ -85,7 +67,6 @@ function renderSpecimen(all,list,projects){
  if($('#weed-back'))$('#weed-back').onclick=goBack;
  const map=$('.specimen-map'),finishArrival=()=>map.classList.remove('weed-arriving');
  for(const event of ['pointerdown','wheel','keydown'])map.addEventListener(event,finishArrival,{once:true,capture:true});
- $$('[data-outside]').forEach(b=>b.onclick=()=>openThread(outside[Number(b.dataset.outside)].name));
  $('#weed-home').onclick=closeThread;
  if($('#weed-parent'))$('#weed-parent').onclick=()=>openThread(collection);
  if($('#weed-group-parent'))$('#weed-group-parent').onclick=()=>openCustomGroup(Specimen.group);
@@ -105,7 +86,7 @@ function renderSpecimen(all,list,projects){
   b.onpointerup=()=>{start=null;b.style.removeProperty('--pull-x');b.style.removeProperty('--pull-y');if(pulled)(scoped?openTopic:openThread)(b.dataset.thread);};
   b.onpointercancel=()=>{start=null;pulled=false;b.style.removeProperty('--pull-x');b.style.removeProperty('--pull-y');};
  }
- graphCleanup=createTumbleweedGraph($('#graph'),mapNodes,edges,id=>{const r=get(id);if(r&&(r.imported||r.kind!=='project')&&!unfolded){openThread(r.collection);}openRecord(id);},{specimen:true,parentCamera,outside,groups,collection:$('#collection').value,matches:hasFilters?new Set(list.map(r=>r.id)):null});
+ graphCleanup=createTumbleweedGraph($('#graph'),mapNodes,edges,id=>{const r=get(id);if(r&&(r.imported||r.kind!=='project')&&!unfolded){openThread(r.collection);}openRecord(id);},{specimen:true,groups,collection:$('#collection').value,matches:hasFilters?new Set(list.map(r=>r.id)):null});
  updateGatherUI();
 }
 function showGather(){
