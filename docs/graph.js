@@ -52,6 +52,13 @@ function createTumbleweedGraph(canvas, records, edges, onOpen, options={}) {
  function curve(a,b,id){const bend=((hash(id)%100)/100-.5)*.45,dx=b.x-a.x,dy=b.y-a.y;ctx.moveTo(a.x,a.y);ctx.bezierCurveTo(a.x+dx*.32-dy*bend,a.y+dy*.32+dx*bend,a.x+dx*.72-dy*bend*.6,a.y+dy*.72+dx*bend*.6,b.x,b.y);}
  let frame=0,disposed=false,lastFrame=0,lastMove=0,velocity={yaw:0,pitch:0,roll:0};
  const reducedMotion=window.matchMedia?.('(prefers-reduced-motion: reduce)');
+ let entry=options.transition&&!reducedMotion?.matches?{start:performance.now(),zoom,scale:options.transition==='in'?.62:1.18}:null;
+ let previousCanvas=entry?options.previousCanvas:null,entryProgress=0;
+ options.previousCanvas=null; // Release the detached view after this short transition.
+ if(entry){entry.scale=Math.max(.35,Math.min(3,zoom*entry.scale))/zoom;shown.zoom=zoom*entry.scale;}
+ // Direct input takes over at the visible scale, with no jump or queued animation.
+ function stopEntry(){if(!entry)return;zoom=shown.zoom;entry=null;previousCanvas=null;}
+
  function stopMotion(){velocity={yaw:0,pitch:0,roll:0};}
  function rotateScreen(dx,dy){
   const angle=Math.hypot(dx,dy);if(!angle)return;
@@ -87,14 +94,15 @@ function createTumbleweedGraph(canvas, records, edges, onOpen, options={}) {
  function animate(now){
   frame=0;if(disposed)return;
   const dt=Math.max(1,Math.min(64,now-lastFrame));lastFrame=now;
-  if(reducedMotion?.matches)stopMotion();
+  if(reducedMotion?.matches){stopMotion();if(entry){shown.zoom=entry.zoom;entry=null;previousCanvas=null;}}
   if(!drag){const decay=Math.exp(-dt/230),travel=230*(1-decay);rotateScreen(velocity.yaw*travel,velocity.pitch*travel);roll+=velocity.roll*travel;for(const key of Object.keys(velocity)){velocity[key]*=decay;if(Math.abs(velocity[key])<.00002)velocity[key]=0;}}
+  if(entry){entryProgress=Math.min(1,(now-entry.start)/420);const eased=1-Math.pow(1-entryProgress,3);shown.zoom=entry.zoom*(entry.scale+(1-entry.scale)*eased);if(entryProgress===1){entry=null;previousCanvas=null;}}
   const blend=reducedMotion?.matches?1:1-Math.exp(-dt/32);let settling=false;
-  for(const [key,target] of Object.entries({yaw,pitch,roll,zoom,panX,panY})){const gap=target-shown[key];if(Math.abs(gap)<.0001)shown[key]=target;else{shown[key]+=gap*blend;settling=true;}}
-  paint();if(settling||Object.values(velocity).some(v=>v!==0)&&!drag)frame=requestAnimationFrame(animate);
+  for(const [key,target] of Object.entries({yaw,pitch,roll,zoom,panX,panY})){if(entry&&key==='zoom')continue;const gap=target-shown[key];if(Math.abs(gap)<.0001)shown[key]=target;else{shown[key]+=gap*blend;settling=true;}}
+  paint();if(entry||settling||Object.values(velocity).some(v=>v!==0)&&!drag)frame=requestAnimationFrame(animate);
  }
  const pauseMotion=()=>{
-  cancelHold();stopMotion();({yaw,pitch,roll,zoom,panX,panY}=shown);
+  stopEntry();cancelHold();stopMotion();({yaw,pitch,roll,zoom,panX,panY}=shown);
   const captured=[...pointers.keys()];pointers.clear();drag=null;
   pinchDistance=0;pinchCenter=null;pinchAngle=0;hover=null;canvas.style.cursor='grab';
   for(const id of captured)if(canvas.hasPointerCapture?.(id))canvas.releasePointerCapture(id);
@@ -104,6 +112,11 @@ function createTumbleweedGraph(canvas, records, edges, onOpen, options={}) {
  reducedMotion?.addEventListener('change',pauseMotion);
  function paint(){
   ctx.clearRect(0,0,width,height);
+  if(previousCanvas&&entry){
+   const alpha=Math.max(0,1-entryProgress*2.4),scale=1+(options.transition==='in'?-.18:.18)*entryProgress;
+   const fit=Math.min(width/previousCanvas.width,height/previousCanvas.height)*scale,w=previousCanvas.width*fit,h=previousCanvas.height*fit;
+   ctx.globalAlpha=alpha*.65;ctx.drawImage(previousCanvas,(width-w)/2,(height-h)/2,w,h);ctx.globalAlpha=1;
+  }
   const active=hover?.r.id||focus;
   const related=new Set([active]);if(active)for(const e of edges){if(e.from===active)related.add(e.to);if(e.to===active)related.add(e.from);}
   // Grounding shadow under the twig silhouette, no network or image asset.
@@ -148,7 +161,7 @@ function createTumbleweedGraph(canvas, records, edges, onOpen, options={}) {
  function beginPointer(e,branch=null){
   if(e.button!==0)return;
   if(pointers.size>=2){e.preventDefault();return;}
-  cancelHold();
+  stopEntry();cancelHold();
   const interrupted=Object.values(velocity).some(v=>v!==0)&&!pointers.size;
   if(!pointers.size){stopMotion();({yaw,pitch,roll,zoom,panX,panY}=shown);}lastMove=performance.now();
   const p=point(e);pointers.set(e.pointerId,p);canvas.setPointerCapture(e.pointerId);
@@ -208,10 +221,10 @@ function createTumbleweedGraph(canvas, records, edges, onOpen, options={}) {
  canvas.onpointercancel=e=>finishPointer(e,true);
  canvas.onlostpointercapture=e=>finishPointer(e,true);
  canvas.onpointerleave=()=>{if(hover){hover=null;schedulePaint();}};
- const wheel=e=>{e.preventDefault();cancelHold();stopMotion();const delta=e.deltaY*(e.deltaMode===1?16:e.deltaMode===2?height:1);zoom=clampZoom(zoom*Math.exp(-delta*.0015));schedulePaint();};
+ const wheel=e=>{e.preventDefault();stopEntry();cancelHold();stopMotion();const delta=e.deltaY*(e.deltaMode===1?16:e.deltaMode===2?height:1);zoom=clampZoom(zoom*Math.exp(-delta*.0015));schedulePaint();};
  canvas.addEventListener('wheel',wheel,{passive:false});
  canvas.oncontextmenu=e=>{if(held||holdOrigin)e.preventDefault();};
- document.querySelector('#rotate-left').onclick=()=>{stopMotion();rotateScreen(-.25,0);schedulePaint();};document.querySelector('#rotate-right').onclick=()=>{stopMotion();rotateScreen(.25,0);schedulePaint();};document.querySelector('#zoom-in').onclick=()=>{zoom=Math.min(3,zoom+.15);schedulePaint();};document.querySelector('#zoom-out').onclick=()=>{zoom=Math.max(.35,zoom-.15);schedulePaint();};document.querySelector('#graph-reset').onclick=()=>{stopMotion();yaw=.18;pitch=-.12;roll=0;zoom=1;panX=0;panY=0;focus='';document.querySelector('#graph-focus').value='';schedulePaint();};
+ document.querySelector('#rotate-left').onclick=()=>{stopEntry();stopMotion();rotateScreen(-.25,0);schedulePaint();};document.querySelector('#rotate-right').onclick=()=>{stopEntry();stopMotion();rotateScreen(.25,0);schedulePaint();};document.querySelector('#zoom-in').onclick=()=>{stopEntry();zoom=Math.min(3,zoom+.15);schedulePaint();};document.querySelector('#zoom-out').onclick=()=>{stopEntry();zoom=Math.max(.35,zoom-.15);schedulePaint();};document.querySelector('#graph-reset').onclick=()=>{stopEntry();stopMotion();yaw=.18;pitch=-.12;roll=0;zoom=1;panX=0;panY=0;focus='';document.querySelector('#graph-focus').value='';schedulePaint();};
  document.querySelector('#graph-labels').onchange=e=>{labels=e.target.checked;schedulePaint();};document.querySelector('#graph-texture').onchange=e=>{texture=e.target.checked;schedulePaint();};document.querySelector('#graph-focus').onchange=e=>{focus=e.target.value;schedulePaint();};
- return ()=>{disposed=true;cancelHold();stopMotion();document.removeEventListener('visibilitychange',pauseMotion);reducedMotion?.removeEventListener('change',pauseMotion);pointers.clear();for(const {button,touchAction,down} of branchInputs){button.removeEventListener('pointerdown',down);button.style.touchAction=touchAction;}canvas.removeEventListener('wheel',wheel);canvas.style.touchAction=originalTouchAction;cancelAnimationFrame(frame);frame=0;drag=null;graphCamera={yaw:shown.yaw,pitch:shown.pitch,roll:shown.roll,zoom:shown.zoom,panX:shown.panX,panY:shown.panY,labels,texture};observer.disconnect();for(const event of ['onpointerdown','onpointermove','onpointerup','onpointercancel','onlostpointercapture','onpointerleave','oncontextmenu'])canvas[event]=null;};
+ return ()=>{if(entry)shown.zoom=entry.zoom;entry=null;previousCanvas=null;disposed=true;cancelHold();stopMotion();document.removeEventListener('visibilitychange',pauseMotion);reducedMotion?.removeEventListener('change',pauseMotion);pointers.clear();for(const {button,touchAction,down} of branchInputs){button.removeEventListener('pointerdown',down);button.style.touchAction=touchAction;}canvas.removeEventListener('wheel',wheel);canvas.style.touchAction=originalTouchAction;cancelAnimationFrame(frame);frame=0;drag=null;graphCamera={yaw:shown.yaw,pitch:shown.pitch,roll:shown.roll,zoom:shown.zoom,panX:shown.panX,panY:shown.panY,labels,texture};observer.disconnect();for(const event of ['onpointerdown','onpointermove','onpointerup','onpointercancel','onlostpointercapture','onpointerleave','oncontextmenu'])canvas[event]=null;};
 }

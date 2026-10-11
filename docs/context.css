@@ -107,10 +107,6 @@ dialog::backdrop{background:rgba(10,17,14,.7)}
 
 @media(min-width:761px){.weed-path~.specimen-table{height:calc(100dvh - 270px);min-height:540px}}
 
-/* Enter a branch without moving its touch targets beneath the user's finger. */
 .weed-path{scroll-margin-top:12px}
-.weed-arriving .graph-stage{animation:weed-arrival .28s ease-out}
-@keyframes weed-arrival{from{opacity:.25}to{opacity:1}}
-@media(prefers-reduced-motion:reduce){.weed-arriving .graph-stage{animation:none}}
 
 

@@ -1,12 +1,12 @@
 const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict'),path=require('node:path');
 const code=fs.readFileSync(path.join(__dirname,'../public/graph.js'),'utf8');
-function setup(reduced=false,specimen=false,initialCamera=null){
+function setup(reduced=false,specimen=false,initialCamera=null,transition=null){
  let draws=0,serial=0,resize,opened=0,cleanup,clock=0,nodePoint;const frames=new Map(),controls=new Map(),listeners=new Map(),timers=new Map(),documentListeners=new Map();let timerId=0,strokes=[],ghostPaths=[],currentPath=[];const handles=['a','b'].map(collection=>({dataset:{thread:collection},offsetWidth:100,offsetHeight:44,classList:{toggle(){}},style:{},clicks:0,click(){this.clicks++},addEventListener(type,fn){this[type]=fn},removeEventListener(type){delete this[type]}}));function advance(ms){clock+=ms;for(const [id,t] of [...timers])if(t.at<=clock){timers.delete(id);t.fn()}}
  const context=new Proxy({arc(x,y){nodePoint={x,y}},moveTo(x,y){assert.ok(Number.isFinite(x)&&Number.isFinite(y),'fiber coordinates must stay finite');currentPath=[[x,y]]},lineTo(x,y){currentPath.push([x,y])},stroke(){strokes.push(context.strokeStyle);if(context.strokeStyle==='rgba(167,157,121,.12)')ghostPaths.push(currentPath)},clearRect(){draws++;strokes=[];ghostPaths=[]},measureText(){return {width:30}},createRadialGradient(){return {addColorStop(){}}}}, {get:(o,k)=>o[k]||(()=>{})});
  const canvas={getContext:()=>context,parentElement:{clientWidth:600,clientHeight:500,querySelectorAll:()=>handles},style:{},addEventListener(type,fn,options){listeners.set(type,{fn,options})},removeEventListener(type){listeners.delete(type)},getBoundingClientRect:()=>({left:0,top:0}),setPointerCapture(){}};
  const sandbox={setTimeout(fn,ms){timers.set(++timerId,{fn,at:clock+ms});return timerId},clearTimeout(id){timers.delete(id)},performance:{now:()=>clock},window:{devicePixelRatio:3,innerWidth:600,matchMedia:()=>({matches:reduced,addEventListener(){},removeEventListener(){}})},document:{addEventListener(type,fn){documentListeners.set(type,fn)},removeEventListener(type){documentListeners.delete(type)},querySelector(id){if(!controls.has(id))controls.set(id,{});return controls.get(id)}},ResizeObserver:class{constructor(fn){resize=fn}observe(){resize()}disconnect(){}},requestAnimationFrame(fn){frames.set(++serial,fn);return serial},cancelAnimationFrame(id){frames.delete(id)}};
  vm.createContext(sandbox);vm.runInContext(code,sandbox);if(initialCamera){sandbox.initialCamera=initialCamera;vm.runInContext("graphCamera=initialCamera",sandbox);}
- cleanup=sandbox.createTumbleweedGraph(canvas,[{id:'one',title:'One',kind:'note',collection:'a',topics:[]},{id:'two',title:'Two',kind:'note',collection:'b',topics:[]}],[{id:'edge',from:'one',to:'two',basis:'explicit'}],()=>{opened++;cleanup()},{specimen,groups:['a','b']});
+ cleanup=sandbox.createTumbleweedGraph(canvas,[{id:'one',title:'One',kind:'note',collection:'a',topics:[]},{id:'two',title:'Two',kind:'note',collection:'b',topics:[]}],[{id:'edge',from:'one',to:'two',basis:'explicit'}],()=>{opened++;cleanup()},{specimen,transition,groups:['a','b']});
  return {canvas,controls,frames,listeners,documentListeners,cleanup,handles,timers,get highlighted(){return strokes.includes('rgba(230,182,108,.95)')},get ghostPaths(){return ghostPaths},get nodePoint(){return nodePoint},get camera(){return vm.runInContext('graphCamera',sandbox)},resize:()=>resize(),advance,settle(){for(let n=0;frames.size&&n<500;n++)this.flush();assert.equal(frames.size,0)},flush(ms=16){advance(ms);const pending=[...frames.values()];frames.clear();pending.forEach(fn=>fn(clock))},get draws(){return draws},get opened(){return opened}};
 }
 let g=setup();assert.equal(g.frames.size,1);g.resize();g.resize();assert.equal(g.frames.size,1);g.flush();assert.equal(g.draws,1);assert.equal(g.canvas.width,1200);console.log('PASS resize is coalesced and density capped');
@@ -72,3 +72,17 @@ for(const type of ['touch','mouse'])for(const pitch of [-Math.PI/2,-2,-.12,Math.
  }
 }
 console.log('PASS touch and mouse follow screen directions after twists, upside-down turns, and pole crossings');
+
+function enteringCamera({reduced=false,interrupt=false,finish=false,initial=null,direction='in'}={}){
+ const t=setup(reduced,true,initial,direction);t.flush(16);
+ if(interrupt)t.canvas.onpointerdown(event(1,100,100));
+ if(finish)t.settle();
+ t.cleanup();assert.equal(t.frames.size,0);return t.camera;
+}
+const partial=enteringCamera({interrupt:true});assert.ok(partial.zoom>.62&&partial.zoom<1);
+assert.equal(enteringCamera({finish:true}).zoom,1);assert.equal(enteringCamera({reduced:true,interrupt:true}).zoom,1);
+assert.equal(enteringCamera().zoom,1,'navigation during entry preserves intended camera, not transitional scale');
+assert.ok(enteringCamera({direction:'out',interrupt:true}).zoom>1);
+for(const zoom of [.35,3]){const c=enteringCamera({initial:{yaw:.18,pitch:-.12,roll:0,zoom,panX:0,panY:0,labels:false,texture:true},interrupt:true});assert.ok(c.zoom>=.35&&c.zoom<=3)}
+console.log('PASS branch entry settles, reduced motion skips it, touch takes over, return reverses depth, and camera limits survive interruption');
+g=setup(false,true,null,'in');g.flush();g.canvas.onpointerdown(event(1,100,100));g.canvas.onpointerdown(event(2,200,100));g.canvas.onpointermove(event(2,250,100));g.canvas.onpointerup(event(2,250,100));g.canvas.onpointerup(event(1,100,100));g.settle();g.cleanup();assert.ok(Math.abs(g.camera.zoom-partial.zoom*1.5)<1e-9);console.log('PASS pinch during entry starts at visible scale and retains exact release zoom');
