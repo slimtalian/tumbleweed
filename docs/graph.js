@@ -48,7 +48,7 @@ function createTumbleweedGraph(canvas, records, edges, onOpen, options={}) {
  }
  const nodeColor=r=>r.kind==='project'?'#c4ab78':r.kind==='conversation'||r.kind==='note'?'#a0b2a2':r.kind==='experience'?'#899b86':r.kind==='artifact'||r.kind==='resource'?'#b0a58f':'#b4b6a4';
  const shown={yaw,pitch,roll,zoom,panX,panY};
- function project(p){const x=p.x*Math.cos(shown.yaw)-p.z*Math.sin(shown.yaw),z=p.x*Math.sin(shown.yaw)+p.z*Math.cos(shown.yaw),y=p.y*Math.cos(shown.pitch)-z*Math.sin(shown.pitch),depth=p.y*Math.sin(shown.pitch)+z*Math.cos(shown.pitch);const rx=x*Math.cos(shown.roll)-y*Math.sin(shown.roll),ry=x*Math.sin(shown.roll)+y*Math.cos(shown.roll),scale=Math.min(width*(options.specimen?.33:.39),height*.40)*shown.zoom,perspective=1+depth*.07;return{x:width/2+shown.panX+rx*scale*perspective,y:height*.48+shown.panY+ry*scale*.96*perspective,z:depth};}
+ function project(p,camera=shown){const x=p.x*Math.cos(camera.yaw)-p.z*Math.sin(camera.yaw),z=p.x*Math.sin(camera.yaw)+p.z*Math.cos(camera.yaw),y=p.y*Math.cos(camera.pitch)-z*Math.sin(camera.pitch),depth=p.y*Math.sin(camera.pitch)+z*Math.cos(camera.pitch);const rx=x*Math.cos(camera.roll)-y*Math.sin(camera.roll),ry=x*Math.sin(camera.roll)+y*Math.cos(camera.roll),scale=Math.min(width*(options.specimen?.33:.39),height*.40)*camera.zoom,perspective=1+depth*.07;return{x:width/2+camera.panX+rx*scale*perspective,y:height*.48+camera.panY+ry*scale*.96*perspective,z:depth};}
  function curve(a,b,id){const bend=((hash(id)%100)/100-.5)*.45,dx=b.x-a.x,dy=b.y-a.y;ctx.moveTo(a.x,a.y);ctx.bezierCurveTo(a.x+dx*.32-dy*bend,a.y+dy*.32+dx*bend,a.x+dx*.72-dy*bend*.6,a.y+dy*.72+dx*bend*.6,b.x,b.y);}
  let frame=0,disposed=false,lastFrame=0,lastMove=0,velocity={yaw:0,pitch:0,roll:0};
  const reducedMotion=window.matchMedia?.('(prefers-reduced-motion: reduce)');
@@ -106,10 +106,20 @@ function createTumbleweedGraph(canvas, records, edges, onOpen, options={}) {
   ctx.clearRect(0,0,width,height);
   const active=hover?.r.id||focus;
   const related=new Set([active]);if(active)for(const e of edges){if(e.from===active)related.add(e.to);if(e.to===active)related.add(e.from);}
+  // The parent is a decorative, stationary silhouette, never an extra set of
+  // records or evidence edges. Its orientation stays fixed while the child turns.
+  if(texture&&options.parentCamera){
+   const parentView={...options.parentCamera,zoom:1.34,panX:0,panY:0};
+   ctx.strokeStyle='rgba(167,157,121,.12)';ctx.lineWidth=.65;
+   for(let i=0;i<fibers.length;i+=5){
+    const ps=fibers[i].path.map(p=>project(p,parentView));ctx.beginPath();ctx.moveTo(ps[0].x,ps[0].y);
+    for(let j=1;j<ps.length;j++)ctx.lineTo(ps[j].x,ps[j].y);ctx.stroke();
+   }
+  }
   // Grounding shadow under the twig silhouette, no network or image asset.
   const shadow=ctx.createRadialGradient(width/2,height*.89,1,width/2,height*.89,width*.27);
   shadow.addColorStop(0,'rgba(0,0,0,.25)');shadow.addColorStop(1,'rgba(0,0,0,0)');ctx.fillStyle=shadow;ctx.fillRect(0,height*.81,width,height*.18);
-  if(texture&&nodes.length){for(const fiber of fibers){const ps=fiber.path.map(project),depth=ps.reduce((n,p)=>n+p.z,0)/ps.length;ctx.beginPath();ctx.moveTo(ps[0].x,ps[0].y);for(let i=1;i<ps.length-1;i++){const p=ps[i],next=ps[i+1];ctx.quadraticCurveTo(p.x,p.y,(p.x+next.x)/2,(p.y+next.y)/2);}ctx.lineTo(ps.at(-1).x,ps.at(-1).y);ctx.lineWidth=fiber.weight;ctx.strokeStyle=`rgba(193,157,101,${fiber.alpha*(.82+(depth+1)*.28)*(active?.62:1)})`;ctx.stroke();}}
+  if(texture&&nodes.length){for(const fiber of fibers){const ps=fiber.path.map(p=>project(p)),depth=ps.reduce((n,p)=>n+p.z,0)/ps.length;ctx.beginPath();ctx.moveTo(ps[0].x,ps[0].y);for(let i=1;i<ps.length-1;i++){const p=ps[i],next=ps[i+1];ctx.quadraticCurveTo(p.x,p.y,(p.x+next.x)/2,(p.y+next.y)/2);}ctx.lineTo(ps.at(-1).x,ps.at(-1).y);ctx.lineWidth=fiber.weight;ctx.strokeStyle=`rgba(193,157,101,${fiber.alpha*(.82+(depth+1)*.28)*(active?.62:1)})`;ctx.stroke();}}
   if(options.specimen){
    // Measure all labels before writing positions, avoiding a layout flush per label.
    const handles=[...parent.querySelectorAll('[data-thread]')].map(b=>({b,labelWidth:b.offsetWidth,labelHeight:b.offsetHeight||44}));
@@ -118,12 +128,22 @@ function createTumbleweedGraph(canvas, records, edges, onOpen, options={}) {
     const center=project(origin),anchor=project(mul(origin,1.65)),side=anchor.x<width/2?-1:1;
     b.classList.toggle('west',side<0);
     const x=Math.max(side<0?labelWidth+4:4,Math.min(width-(side>0?labelWidth+4:4),anchor.x));
-    const y=Math.max(labelHeight/2+8,Math.min(height-72-labelHeight/2,anchor.y));
+    const y=Math.max(labelHeight/2+((options.outside||[]).length?80:8),Math.min(height-72-labelHeight/2,anchor.y));
     b.style.left=x+'px';b.style.top=y+'px';b.style.opacity=String(Math.max(.65,Math.min(1,.82+center.z*.2)));b.style.zIndex=String(Math.round(100+center.z*20));
     ctx.beginPath();ctx.moveTo(center.x,center.y);ctx.quadraticCurveTo((center.x+x)/2,(center.y+y)/2-8,x,y);ctx.lineWidth=options.collection===b.dataset.thread?1.5:.7;ctx.strokeStyle=options.collection===b.dataset.thread?'#c6ad72':'rgba(162,140,98,.25)';ctx.stroke();
    });
   }
   positions=points.map(p=>({...project(p),r:p.r,size:p.r.kind==='project'?5.8:2.5+Math.min(3,(degree.get(p.r.id)||0)*.28)}));
+  // At most three existing cross-scope links; their inner endpoints follow rotation.
+  const outsideHandles=[...parent.querySelectorAll('[data-outside]')];
+  for(const button of outsideHandles){
+   const i=Number(button.dataset.outside),group=options.outside?.[i];if(!group)continue;
+   const link=group.links.find(e=>e.inside===active)||group.links[0],a=positions[indices.get(link.inside)];if(!a)continue;
+   const x=width*(i+.5)/options.outside.length,y=58;
+   button.style.left=x+'px';button.style.top='8px';
+   ctx.beginPath();ctx.strokeStyle=active===link.inside?'rgba(230,182,108,.95)':'rgba(199,169,119,.5)';ctx.lineWidth=1;
+   ctx.setLineDash(link.basis==='inferred'?[4,4]:[]);curve(a,{x,y},link.id);ctx.stroke();ctx.setLineDash([]);
+  }
   for(const e of edges){const a=positions[indices.get(e.from)],b=positions[indices.get(e.to)];if(!a||!b)continue;const hot=active&&(e.from===active||e.to===active);ctx.beginPath();ctx.strokeStyle=hot?'rgba(230,182,108,.95)':active?'rgba(164,145,111,.065)':'rgba(199,169,119,.36)';ctx.lineWidth=hot?1.7:.85;ctx.setLineDash(e.basis==='inferred'?[4,4]:[]);curve(a,b,e.id);ctx.stroke();}ctx.setLineDash([]);
   for(const p of [...positions].sort((a,b)=>a.z-b.z)){const hit=active===p.r.id,dim=options.matches&&!options.matches.has(p.r.id);ctx.globalAlpha=dim?.13:active&&!related.has(p.r.id)?.2:.7+(p.z+1)*.15;ctx.fillStyle=nodeColor(p.r);if(hit){ctx.beginPath();ctx.arc(p.x,p.y,p.size+6,0,Math.PI*2);ctx.strokeStyle='#e8bd78';ctx.lineWidth=1.3;ctx.stroke();ctx.shadowBlur=13;ctx.shadowColor='#dfb570';}ctx.beginPath();ctx.arc(p.x,p.y,p.size,0,Math.PI*2);ctx.fill();ctx.shadowBlur=0;}
   ctx.globalAlpha=1;
@@ -160,7 +180,7 @@ function createTumbleweedGraph(canvas, records, edges, onOpen, options={}) {
  canvas.onpointerdown=e=>beginPointer(e);
  // A touch on a label belongs to the same gesture as a touch on the canvas.
  // Capture subsequent movement on the canvas; a stationary release opens the label.
- const branchInputs=[...parent.querySelectorAll('[data-thread]')].map(button=>{
+ const branchInputs=[...parent.querySelectorAll('[data-thread], [data-outside]')].map(button=>{
   const touchAction=button.style.touchAction;
   const down=e=>{if(e.pointerType==='touch')beginPointer(e,button);};
   button.style.touchAction='none';button.addEventListener('pointerdown',down);

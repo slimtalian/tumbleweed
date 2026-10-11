@@ -1,0 +1,12 @@
+const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
+const source=fs.readFileSync(__dirname+'/../public/specimen.js','utf8');
+const context=vm.createContext({sessionStorage:{getItem(){return null}}});vm.runInContext(source,context);
+const run=(nodes,all,edges)=>JSON.parse(JSON.stringify(context.outsideWeedGroups(nodes,all,edges)));
+const a={id:'a'},b={id:'b',collection:'Garden'},c={id:'c',collection:'Garden'},d={id:'d',collection:'Hidden',archived:true};
+const edges=[{id:'1',from:'a',to:'b',basis:'inferred'},{id:'2',from:'c',to:'a',basis:'explicit'},{id:'3',from:'a',to:'d'},{id:'4',from:'a',to:'missing'},{id:'5',from:'a',to:'a'},{id:'duplicate',from:'a',to:'b',basis:'inferred'}];
+let result=run([a],[a,b,c,d],edges);assert.equal(result.length,1);assert.equal(result[0].name,'Garden');assert.equal(result[0].links.length,2);assert.equal(result[0].links[0].id,'2');
+assert.deepEqual(run([a,b,c],[a,b,c,d],edges),[]);assert.deepEqual(run([a],[a,b],[]),[]);
+const others=['Z','A','B','C'].map(id=>({id,collection:id}));const links=others.map(r=>({id:r.id,from:'a',to:r.id,basis:'explicit'}));
+assert.deepEqual(run([a],[a,...others],links).map(g=>g.name),['A','B','C']);assert.deepEqual(run([a],[a,...others],links),run([a],[a,...others],links.reverse()));
+const crowded=Array.from({length:1501},(_,i)=>({id:'n'+i}));assert.deepEqual(run(crowded,[...crowded,b],[{from:'n1500',to:'b'}]),[]);
+console.log('PASS outside strands use existing links only, ignore archived/missing/internal endpoints, deduplicate, prefer explicit links, cap groups deterministically and respect the rendered node limit');
