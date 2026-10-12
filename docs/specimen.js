@@ -40,7 +40,8 @@ function renderSpecimen(all,list,projects){
  if(Specimen.group&&!customNames.includes(Specimen.group))Specimen.group='';
  try{sessionStorage.setItem('tumbleweed-group:'+dataPath,Specimen.group);}catch{}
  const scoped=!!(collection||topic||Specimen.group);
- const nodes=allNodes.filter(r=>(!collection||r.collection===collection)&&(!topic||(r.topics||[]).includes(topic))&&(!Specimen.group||(r.groups||[]).includes(Specimen.group)));
+ const searchScope=parseKnowledgeSearch($('#search').value,all.map(r=>r.collection));
+ const nodes=allNodes.filter(r=>matchesKnowledgeScopes(r,searchScope)&&(!collection||r.collection===collection)&&(!topic||(r.topics||[]).includes(topic))&&(!Specimen.group||(r.groups||[]).includes(Specimen.group)));
  if(Specimen.group)list=list.filter(r=>(r.groups||[]).includes(Specimen.group));
  const topics=[...new Set(nodes.flatMap(r=>r.topics||[]))].sort((a,b)=>a.localeCompare(b));
  const groups=scoped?(topic?[]:topics):Catalog.audit(nodes,[]).collections;

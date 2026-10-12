@@ -43,6 +43,8 @@ async function mutate(body) {
  finally {saveBusy=false;}
 }
 function refreshFilters() {
+ let suggestions=$('#search-scopes');if(!suggestions){suggestions=document.createElement('datalist');suggestions.id='search-scopes';document.body.append(suggestions);$('#search').setAttribute('list',suggestions.id);$('#search').title='Scope with journal:day 41 or in:"Collection name" words. Also topic:water, type:project and "exact phrase".';}
+ suggestions.replaceChildren(...[...new Set(records().map(r=>r.collection))].sort().map(name=>{const option=document.createElement('option');option.value=/^[\p{L}\p{N}_-]+$/u.test(name)&&!['in','collection','topic','type'].includes(name.toLowerCase())?name.toLowerCase()+':':'in:"'+name+'" ';option.label='Search '+name;return option;}));
  for (const [selector, vals, all] of [['#collection',records().map(r=>r.collection),'All collections'],['#topic',records().flatMap(r=>r.topics || []),'All topics'],['#coverage',records().map(r=>r.evidence_label),'All evidence']]) {
   const el=$(selector), keep=el.value;
   el.innerHTML=`<option value="">${all}</option>`+[...new Set(vals.filter(Boolean))].sort().map(v=>`<option value="${esc(v)}">${esc(selector==='#topic'?Catalog.topicLabel(v):label(v))}</option>`).join('');el.value=keep;
@@ -50,9 +52,42 @@ function refreshFilters() {
 }
 function dateText(r) {return pretty(r.dates || r.created_at || 'Date unavailable');}
 function dateValues(r) {return dateText(r).match(/\d{4}-\d{2}-\d{2}/g) || [];}
+function parseKnowledgeSearch(value,collections){
+ const normalize=s=>s.toLowerCase().replace(/[\s_-]+/g,' ').trim();
+ const known=new Map(collections.map(c=>[normalize(c),c])),terms=[],scopes=[];let error='';
+ if((value.match(/"/g)||[]).length%2)return {terms,scopes,error:'Close the quotation mark to finish searching.'};
+ const tokens=value.match(/[^\s"]*"[^"]*"|[^\s]+/g)||[];
+ for(const token of tokens){
+  const match=token.match(/^([\p{L}\p{N}_-]+):(.*)$/u);
+  if(!match||/^https?:\/\//i.test(token)){terms.push(token.replace(/^"|"$/g,''));continue;}
+  const key=normalize(match[1]),arg=match[2].replace(/^"|"$/g,'');
+  if(['in','collection','topic','type'].includes(key)){
+   if(!arg){error='Add a value after '+match[1]+':';break;}
+   if(key==='in'||key==='collection'){
+    const name=known.get(normalize(arg));if(!name){error='No collection named “'+arg+'”.';break;}
+    scopes.push({field:'collection',value:name});
+   }else scopes.push({field:key==='type'?'kind':'topics',value:arg.toLowerCase()});
+  }else if(known.has(key)){
+   scopes.push({field:'collection',value:known.get(key)});if(arg)terms.push(arg);
+  }else{error='Unknown search scope “'+match[1]+'”. Use a collection name, in:, topic: or type:.';break;}
+ }
+ return {terms:terms.map(s=>s.toLowerCase()),scopes,error};
+}
+function matchesKnowledgeScopes(record,query){
+ return !query.error&&query.scopes.every(s=>s.field==='topics'?(record.topics||[]).some(t=>t.toLowerCase()===s.value):String(record[s.field]||'').toLowerCase()===s.value.toLowerCase());
+}
+function showKnowledgeSearch(query){
+ let hint=$('#search-scope');if(!hint){hint=document.createElement('p');hint.id='search-scope';hint.className='search-scope';hint.setAttribute('role','status');$('.toolbar').after(hint);$('#search').setAttribute('aria-describedby',hint.id);}
+ hint.hidden=!$('#search').value.trim()||['imports','guide','discover','review','projects'].includes(view);
+ hint.textContent=query.error||[...query.scopes.map(s=>(s.field==='collection'?'In ':s.field==='topics'?'Topic: ':'Type: ')+s.value),query.terms.length?'Matching: '+query.terms.join(' · '):'All records in this scope'].join(' · ');
+ $('#search').setAttribute('aria-invalid',query.error?'true':'false');
+}
+
 function filtered() {
- const q=$('#search').value.toLowerCase().trim().split(/\s+/).filter(Boolean), topic=$('#topic').value, cov=$('#coverage').value, from=$('#from-date').value, to=$('#to-date').value;
+ const query=parseKnowledgeSearch($('#search').value,records().map(r=>r.collection));showKnowledgeSearch(query);
+ const q=query.terms, topic=$('#topic').value, cov=$('#coverage').value, from=$('#from-date').value, to=$('#to-date').value;
  return records().filter(r=>{
+  if(!matchesKnowledgeScopes(r,query))return false;
   if(r.archived && !$('#archived').checked) return false;
   if(topic && !(r.topics || []).includes(topic)) return false;
   if($('#collection').value && r.collection!==$('#collection').value) return false;
