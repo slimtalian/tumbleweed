@@ -43,8 +43,8 @@ async function mutate(body) {
  finally {saveBusy=false;}
 }
 function refreshFilters() {
- let suggestions=$('#search-scopes');if(!suggestions){suggestions=document.createElement('datalist');suggestions.id='search-scopes';document.body.append(suggestions);$('#search').setAttribute('list',suggestions.id);$('#search').title='Scope with journal:day 41 or in:"Collection name" words. Also topic:water, type:project and "exact phrase".';}
- suggestions.replaceChildren(...[...new Set(records().map(r=>r.collection))].sort().map(name=>{const option=document.createElement('option');option.value=/^[\p{L}\p{N}_-]+$/u.test(name)&&!['in','collection','topic','type'].includes(name.toLowerCase())?name.toLowerCase()+':':'in:"'+name+'" ';option.label='Search '+name;return option;}));
+ $('#search').setAttribute('autocomplete','off');
+ $('#search').title='Scope with journal:day 41 or in:"Collection name" words. Also topic:water, type:project and "exact phrase".';
  for (const [selector, vals, all] of [['#collection',records().map(r=>r.collection),'All collections'],['#topic',records().flatMap(r=>r.topics || []),'All topics'],['#coverage',records().map(r=>r.evidence_label),'All evidence']]) {
   const el=$(selector), keep=el.value;
   el.innerHTML=`<option value="">${all}</option>`+[...new Set(vals.filter(Boolean))].sort().map(v=>`<option value="${esc(v)}">${esc(selector==='#topic'?Catalog.topicLabel(v):label(v))}</option>`).join('');el.value=keep;
